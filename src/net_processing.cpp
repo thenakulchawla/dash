@@ -1523,11 +1523,15 @@ void HandleGrapheneBlockMessage(CNode *pfrom, const std::string strCommand, CBlo
     // Such an unrequested block may still be processed, subject to
     // the conditions in AcceptBlock().    
     bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
+    bool fNewBlock = false;
     const CChainParams& chainparams = Params();
 
     {    
         LOCK(cs_main);
-        ProcessNewBlock(chainparams, pblock, forceProcessing, false);
+        ProcessNewBlock(chainparams, pblock, forceProcessing, &fNewBlock);
+
+        if (fNewBlock)
+            pfrom->nLastBlockTime = GetTime();
     }
 
     int nDoS;
