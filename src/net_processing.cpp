@@ -4522,7 +4522,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
             BOOST_FOREACH(const CBlockIndex *pindex, vToDownload) {
             LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
-                if (fGrapheneBlockEnabled)
+                if (fGrapheneBlockEnabled && connman.HaveGrapheneNodes())
                 {
                     CInv inv2(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash());
                     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
