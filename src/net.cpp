@@ -640,10 +640,10 @@ bool CConnman::HaveGrapheneNodes()
 {
     {
         LOCK(cs_vNodes);
-        LogPrintf("vNodes size: %d \n", vNodes.size());
+        // LogPrintf("vNodes size: %d \n", vNodes.size());
         for (CNode *pnode : vNodes)
         {
-            LogPrintf("GrapheneCapable: %d\n", pnode->GrapheneCapable());
+            // LogPrintf("GrapheneCapable: %d\n", pnode->GrapheneCapable());
             if (pnode->GrapheneCapable())
                 return true;
         }
