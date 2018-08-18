@@ -44,6 +44,14 @@ if ENABLE_WALLET
 LIBBITCOIN_WALLET=libdash_wallet.a
 endif
 
+if ENABLE_RAPTOR
+LIBBITCOIN_RAPTOR=libdash_raptor.a
+endif
+
+if ENABLE_ERASURE
+LIBBITCOIN_JERASURE=libdash_jerasure.a
+endif
+
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
@@ -129,10 +137,70 @@ BITCOIN_CORE_H = \
   indirectmap.h \
   init.h \
   instantx.h \
+  jerasure/gf_w4.h \
+  jerasure/gf_w8.h \
+  jerasure/gf_w16.h \
+  jerasure/gf_w32.h \
+  jerasure/gf_w64.h \
+  jerasure/gf_rand.h \
+  jerasure/gf_cpu.h \
+  jerasure/gf_int.h \
+  jerasure/gf_method.h \
+  jerasure/gf_general.h \
+  jerasure/gf_complete.h \
+  jerasure/galois.h \
+  jerasure/jerasure.h \
+  jerasure/reed_sol.h \
+  jerasure/cauchy.h \
+  jerasure/liberation.h \
+  jerasure/timing.h \
+  jerasure/erasure_encode.h \
   key.h \
   keepass.h \
   keystore.h \
   dbwrapper.h \
+  libRaptorQ/RaptorQ/v1/Shared_Computation/Decaying_LF.hpp \
+  libRaptorQ/RaptorQ/v1/Shared_Computation/LZ4_Wrapper.hpp \
+  libRaptorQ/RaptorQ/v1/util/Bitmask.hpp \
+  libRaptorQ/RaptorQ/v1/util/div.hpp \
+  libRaptorQ/RaptorQ/v1/util/endianess.hpp \
+  libRaptorQ/RaptorQ/v1/util/Graph.hpp \
+  libRaptorQ/RaptorQ/v1/wrapper/C_common.h \
+  libRaptorQ/RaptorQ/v1/wrapper/C_RAW_API.h \
+  libRaptorQ/RaptorQ/v1/wrapper/C_RFC_API.h \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RAW_API.hpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RAW_API_void.hpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RFC_API.hpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RFC_API_iterators.hpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RFC_API_void.hpp \
+  libRaptorQ/RaptorQ/v1/block_sizes.hpp \
+  libRaptorQ/RaptorQ/v1/caches.hpp \
+  libRaptorQ/RaptorQ/v1/caches.ipp \
+  libRaptorQ/RaptorQ/v1/common.hpp \
+  libRaptorQ/RaptorQ/v1/De_Interleaver.hpp \
+  libRaptorQ/RaptorQ/v1/Decoder.hpp \
+  libRaptorQ/RaptorQ/v1/degree.hpp \
+  libRaptorQ/RaptorQ/v1/Encoder.hpp \
+  libRaptorQ/RaptorQ/v1/Interleaver.hpp \
+  libRaptorQ/RaptorQ/v1/multiplication.hpp \
+  libRaptorQ/RaptorQ/v1/Octet.hpp \
+  libRaptorQ/RaptorQ/v1/Operation.hpp \
+  libRaptorQ/RaptorQ/v1/Parameters.hpp \
+  libRaptorQ/RaptorQ/v1/Precode_Matrix.hpp \
+  libRaptorQ/RaptorQ/v1/Precode_Matrix_Init.hpp \
+  libRaptorQ/RaptorQ/v1/Precode_Matrix_Solver.hpp \
+  libRaptorQ/RaptorQ/v1/Rand.hpp \
+  libRaptorQ/RaptorQ/v1/RaptorQ.hpp \
+  libRaptorQ/RaptorQ/v1/RaptorQ_Iterators.hpp \
+  libRaptorQ/RaptorQ/v1/RFC.hpp \
+  libRaptorQ/RaptorQ/v1/RFC_Iterators.hpp \
+  libRaptorQ/RaptorQ/v1/table2.hpp \
+  libRaptorQ/RaptorQ/v1/Thread_Pool.hpp \
+  libRaptorQ/RaptorQ/RFC6330_v1_hdr.hpp \
+  libRaptorQ/RaptorQ/RFC6330_v1.hpp \
+  libRaptorQ/RaptorQ/RFC6330.h \
+  libRaptorQ/RaptorQ/RaptorQ_v1.h \
+  libRaptorQ/RaptorQ/RaptorQ.h \
   limitedmap.h \
   masternode.h \
   masternode-payments.h \
@@ -228,6 +296,30 @@ libdash_server_a_SOURCES = \
   iblt.cpp \
   init.cpp \
   instantx.cpp \
+  jerasure/gf_w16_neon.c \
+  jerasure/gf_w32_neon.c \
+  jerasure/gf_w8_neon.c \
+  jerasure/gf_w4_neon.c \
+  jerasure/gf_w64_neon.c \
+  jerasure/gf_w4.c \
+  jerasure/gf_w8.c \
+  jerasure/gf_w16.c \
+  jerasure/gf_w32.c \
+  jerasure/gf_w64.c \
+  jerasure/gf_w128.c \
+  jerasure/gf_wgen.c \
+  jerasure/gf_method.c \
+  jerasure/gf_cpu.c \
+  jerasure/gf.c \
+  jerasure/gf_rand.c \
+  jerasure/gf_general.c \
+  jerasure/galois.c \
+  jerasure/jerasure.c \
+  jerasure/reed_sol.c \
+  jerasure/cauchy.c \
+  jerasure/liberation.c \
+  jerasure/timing.c \
+  jerasure/erasure_encode.c \
   dbwrapper.cpp \
   governance.cpp \
   governance-classes.cpp \
@@ -235,6 +327,12 @@ libdash_server_a_SOURCES = \
   governance-validators.cpp \
   governance-vote.cpp \
   governance-votedb.cpp \
+  libRaptorQ/deterministic.cpp \
+  libRaptorQ/RaptorQ/v1/wrapper/C_RAW_API.cpp \
+  libRaptorQ/RaptorQ/v1/wrapper/C_RFC_API.cpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_caches.cpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RAW_API_void.cpp \
+  libRaptorQ/RaptorQ/v1/wrapper/CPP_RFC_API_void.cpp \
   masternode.cpp \
   masternode-payments.cpp \
   masternode-sync.cpp \
@@ -300,6 +398,49 @@ libdash_wallet_a_SOURCES = \
   wallet/wallet.cpp \
   wallet/walletdb.cpp \
   policy/rbf.cpp \
+  $(BITCOIN_CORE_H)
+
+# raptor : shared but only linked
+# when raptor sharding enabled
+libdash_raptor_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+libdash_raptor_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+libdash_raptor_a_SOURCES = \
+  libRaptorQ/Shared_Computation/Decaying_LF.hpp \
+  libRaptorQ/Shared_Computation/LZ4_Wrapper.hpp \
+  libRaptorQ/util/Bitmask.hpp \
+  libRaptorQ/util/div.hpp \
+  libRaptorQ/util/endianess.hpp \
+  libRaptorQ/util/Graph.hpp \
+  libRaptorQ/wrapper/C_common.h \
+  libRaptorQ/wrapper/C_RAW_API.h \
+  libRaptorQ/wrapper/C_RFC_API.h \
+  libRaptorQ/wrapper/CPP_RAW_API.hpp \
+  libRaptorQ/wrapper/CPP_RAW_API_void.hpp \
+  libRaptorQ/wrapper/CPP_RFC_API.hpp \
+  libRaptorQ/wrapper/CPP_RFC_Iterators.hpp \
+  libRaptorQ/wrapper/CPP_RFC_API_void.hpp \
+  libRaptorQ/block_sizes.hpp \
+  libRaptorQ/caches.hpp \
+  libRaptorQ/common.hpp \
+  libRaptorQ/De_Interleaver.hpp \
+  libRaptorQ/Decoder.hpp \
+  libRaptorQ/degree.hpp \
+  libRaptorQ/Encoder.hpp \
+  libRaptorQ/Interleaver.hpp \
+  libRaptorQ/multiplication.hpp \
+  libRaptorQ/Octet.hpp \
+  libRaptorQ/Operation.hpp \
+  libRaptorQ/Parameters.hpp \
+  libRaptorQ/Precode_Matrix.hpp \
+  libRaptorQ/Precode_Matrix_Init.hpp \
+  libRaptorQ/Precode_Matrix_Solver.hpp \
+  libRaptorQ/Rand.hpp \
+  libRaptorQ/RaptorQ.hpp \
+  libRaptorQ/RaptorQ_Iterators.hpp \
+  libRaptorQ/RFC.hpp \
+  libRaptorQ/RFC_Iterators.hpp \
+  libRaptorQ/table2.hpp \
+  libRaptorQ/Thread_Pool.hpp \
   $(BITCOIN_CORE_H)
 
 # crypto primitives library

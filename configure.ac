@@ -97,6 +97,20 @@ AC_ARG_ENABLE([wallet],
   [enable_wallet=$enableval],
   [enable_wallet=yes])
 
+# Enable raptor sharding
+AC_ARG_ENABLE([raptor],
+  [AS_HELP_STRING([--disable-raptor],
+  [disable raptor (enabled by default)])],
+  [enable_raptor=$enableval],
+  [enable_raptor=yes])
+
+# Enable erasure sharding
+AC_ARG_ENABLE([erasure],
+  [AS_HELP_STRING([--disable-erasure],
+  [disable erasure (enabled by default)])],
+  [enable_erasure=$enableval],
+  [enable_erasure=yes])
+
 AC_ARG_WITH([miniupnpc],
   [AS_HELP_STRING([--with-miniupnpc],
   [enable UPNP (default is yes if libminiupnpc is found)])],
@@ -964,6 +978,27 @@ else
   AC_MSG_RESULT(no)
 fi
 
+
+dnl enable raptor
+AC_MSG_CHECKING([if raptor should be enabled])
+if test x$enable_raptor != xno; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE_UNQUOTED([ENABLE_RAPTOR],[1],[Define to 1 to enable raptor functions])
+
+else
+    AC_MSG_RESULT(no)
+fi
+
+dnl enable erasure 
+AC_MSG_CHECKING([if erasure should be enabled])
+if test x$enable_erasure != xno; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE_UNQUOTED([ENABLE_RAPTOR],[1],[Define to 1 to enable erasure functions])
+
+else
+    AC_MSG_RESULT(no)
+fi
+
 dnl enable upnp support
 AC_MSG_CHECKING([whether to build with support for UPnP])
 if test x$have_miniupnpc = xno; then
@@ -1057,6 +1092,8 @@ AM_CONDITIONAL([TARGET_DARWIN], [test x$TARGET_OS = xdarwin])
 AM_CONDITIONAL([BUILD_DARWIN], [test x$BUILD_OS = xdarwin])
 AM_CONDITIONAL([TARGET_WINDOWS], [test x$TARGET_OS = xwindows])
 AM_CONDITIONAL([ENABLE_WALLET],[test x$enable_wallet = xyes])
+AM_CONDITIONAL([ENABLE_RAPTOR],[test x$enable_raptor = xyes])
+AM_CONDITIONAL([ENABLE_ERASURE],[test x$enable_erasure = xyes])
 AM_CONDITIONAL([ENABLE_TESTS],[test x$BUILD_TEST = xyes])
 AM_CONDITIONAL([ENABLE_QT],[test x$bitcoin_enable_qt = xyes])
 AM_CONDITIONAL([ENABLE_QT_TESTS],[test x$BUILD_TEST_QT = xyes])
