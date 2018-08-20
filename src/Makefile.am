@@ -6,7 +6,7 @@
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
-AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS)
+AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS) $(PIC_FLAGS)
 AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
 EXTRA_LIBRARIES =
 
@@ -174,8 +174,8 @@ BITCOIN_CORE_H = \
   libRaptorQ/RaptorQ/v1/wrapper/CPP_RFC_API_iterators.hpp \
   libRaptorQ/RaptorQ/v1/wrapper/CPP_RFC_API_void.hpp \
   libRaptorQ/RaptorQ/v1/block_sizes.hpp \
-  libRaptorQ/RaptorQ/v1/caches.hpp \
   libRaptorQ/RaptorQ/v1/caches.ipp \
+  libRaptorQ/RaptorQ/v1/caches.hpp \
   libRaptorQ/RaptorQ/v1/common.hpp \
   libRaptorQ/RaptorQ/v1/De_Interleaver.hpp \
   libRaptorQ/RaptorQ/v1/Decoder.hpp \
@@ -278,8 +278,8 @@ obj/build.h: FORCE
 libdash_util_a-clientversion.$(OBJEXT): obj/build.h
 
 # server: shared between dashd and dash-qt
-libdash_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
-libdash_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+libdash_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS) $(PIC_FLAGS)
+libdash_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS) $(PIC_FLAGS)
 libdash_server_a_SOURCES = \
   activemasternode.cpp \
   addrman.cpp \
@@ -589,8 +589,9 @@ nodist_libdash_util_a_SOURCES = $(srcdir)/obj/build.h
 
 # dashd binary #
 dashd_SOURCES = dashd.cpp
-dashd_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-dashd_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+dashd_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(PIC_FLAGS)
+dashd_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS) $(PIC_FLAGS)
+
 dashd_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS

@@ -49,20 +49,23 @@ enum class Endianness : uint8_t {
 
 constexpr Endianness RAPTORQ_LOCAL get_endianness()
 {
-#if (defined(RQ_BIG_ENDIAN) && !defined(RQ_LITTLE_ENDIAN))
-    return Endianness::BIG;
-#elif (defined(RQ_LITTLE_ENDIAN) && !defined(RQ_BIG_ENDIAN))
+    // since my machine is LITLE
+    // TODO: Nakul, fix this later
     return Endianness::LITTLE;
-#else
-    // no real way to check for the endianness at compile time.
-    // also, if you can do some trick at compile time with constexpr,
-    // note that it will not work when cross-compiling, since the compiler
-    // that executes the constexpr is still the one with the same endianness
-    // or at least, that is what I could get to with https://gcc.godbolt.org/
-    static_assert (false, "RQ: Please specify the endianness with "
-                                                        "-DRQ_LITTLE_ENDIAN "
-                                                        "or -DRQ_BIG_ENDIAN");
-#endif
+// #if (defined(RQ_BIG_ENDIAN) && !defined(RQ_LITTLE_ENDIAN))
+//     return Endianness::BIG;
+// #elif (defined(RQ_LITTLE_ENDIAN) && !defined(RQ_BIG_ENDIAN))
+//     return Endianness::LITTLE;
+// #else
+//     // no real way to check for the endianness at compile time.
+//     // also, if you can do some trick at compile time with constexpr,
+//     // note that it will not work when cross-compiling, since the compiler
+//     // that executes the constexpr is still the one with the same endianness
+//     // or at least, that is what I could get to with https://gcc.godbolt.org/
+//     static_assert (false, "RQ: Please specify the endianness with "
+//                                                         "-DRQ_LITTLE_ENDIAN "
+//                                                         "or -DRQ_BIG_ENDIAN");
+// #endif
 }
 
 
