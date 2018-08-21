@@ -3117,7 +3117,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         // Can't download any more from this peer
                         break;
                     }
-                    if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom))
+                    if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom) && connman.HaveGrapheneNodes())
                     {
                         vGetData.push_back(CInv(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash()));
                         AddGrapheneBlockInFlight(pfrom, pindex->GetBlockHash());
@@ -3141,7 +3141,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
                 if (vGetData.size() > 0) {
                     if (nodestate->fSupportsDesiredCmpctVersion && vGetData.size() == 1 && mapBlocksInFlight.size() == 1 && pindexLast->pprev->IsValid(BLOCK_VALID_CHAIN)) {
-                        if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom))
+                        if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom) && connman.HaveGrapheneNodes())
                         {
                             // In any case, we want to download using a graphene block, not a regular one
                             vGetData[0] = CInv(MSG_GRAPHENE_BLOCK, vGetData[0].hash);
