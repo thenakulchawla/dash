@@ -17,33 +17,11 @@
 
 namespace RaptorQ = RaptorQ__v1;
 
+CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>();}
 
-// bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_prob,
-//                                                         const uint8_t overhead)
-// {
-//     // auto stream = std::ifstream("/home/nchawla3/.dashcore/regtest/blocks/blk00000.dat");
-//     // std::vector<uint8_t> data;
-//
-//     std::for_each(std::istreambuf_iterator<char>(stream),
-//             std::istreambuf_iterator<char>(),
-//             [&data](const char c){
-//             data.push_back(c);
-//             });
-//
-//     const uint16_t symbol_size = 8;
-//
-//     auto min_symbols = (data.size() * sizeof(uint8_t)) / symbol_size;
-//
-//     if (( data.size() * sizeof(uint8_t)) % symbol_size != 0)
-//         ++min_symbols;
-//
-//
-//
-//
-//     return true;
-//
-// }
-
+CRaptorSymbol::~CRaptorSymbol()
+{
+}
 
 template <typename T>
 inline void pack (std::vector< uint8_t >& dst, T& data) {

@@ -21,14 +21,32 @@
 #include <tuple>
 #include <vector>
 #include "serialize.h"
-// #include "../src/libRaptorQ/RaptorQ/RaptorQ_v1_hdr.hpp"
 #include "RaptorQ/RaptorQ_v1_hdr.hpp"
 
 
-// extern bool fShardErasureEnabled;
 extern bool fRaptorEnabled;
 
 class CDataStream;
+
+
+class CRaptorSymbol
+{
+private:
+    std::vector<uint8_t> vEncoded;
+
+public:
+    CRaptorSymbol();
+    ~CRaptorSymbol();
+
+    ADD_SERIALIZE_METHODS;
+    
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
+        READWRITE(vEncoded);
+    }
+
+};
 
 // class CRaptorDecodeSymbol
 // {

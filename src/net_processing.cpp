@@ -3831,6 +3831,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
     else if (strCommand == NetMsgType::GETRAPTORCODES)
     {
+
     }
 
 
