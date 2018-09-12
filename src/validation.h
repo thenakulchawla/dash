@@ -75,9 +75,9 @@ static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 101;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** The maximum size of a blk?????.dat file (since 0.8) */
-static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+static const unsigned int MAX_BLOCKFILE_SIZE = 0x100000; // 128 MiB changed to 1 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
-static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
+static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x100000; // 16 MiB changed to 1 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
@@ -167,8 +167,11 @@ extern CCriticalSection cs_xval;
 extern uint64_t LargestBlockSeen(uint64_t nBlockSize = 0);
 // Xpress Validation: end
 
+/** Raptor section */
+// static const bool DEFAULT_USE_ERASURE = false;
+static const bool DEFAULT_USE_RAPTOR = true;
 
-//DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 16; // Allowed messages lengths will be this * the excessive block size
+extern bool fRaptorEnabled;
 
 struct BlockHasher
 {
@@ -283,10 +286,6 @@ FILE* OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 /** Open an undo file (rev?????.dat) */
 FILE* OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 /** Translation to a filesystem path */
-
-// Nakul sharding
-bool EncodeUsingErasure(FILE* fileIn);
-
 
 boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
 /** Import blocks from an external file */

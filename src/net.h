@@ -365,6 +365,12 @@ public:
 
     void AddWhitelistedRange(const CSubNet &subnet);
 
+    /** CConnman Raptor Begin Section */
+    
+    bool HaveRaptorNodes();
+    
+    /** CConnman Raptor End Section */
+
     /** CConnman Graphene Begin Section */
     bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
     bool HaveGrapheneNodes();
@@ -923,7 +929,17 @@ public:
         nRefCount--;
     }
 
-    // Graphene begin section
+   /** Raptor begin section */
+    bool RaptorCapable()
+    {
+        if (nServices & NODE_RAPTOR)
+            return true;
+        return false;
+    }
+
+    /** Raptor end section */
+
+    /** Graphene begin section */
     bool GrapheneCapable()
     {
         // LogPrintf("nServices %d, NODE_GRAPHENE %s\n", nServices, NODE_GRAPHENE);
@@ -933,7 +949,7 @@ public:
     }
 
 
-    // Graphene End Section
+    /** Graphene End Section */
 
     void AddAddressKnown(const CAddress& _addr)
     {

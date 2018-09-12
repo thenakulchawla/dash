@@ -43,6 +43,8 @@ const char *GRAPHENEBLOCK = "grblk";
 const char *GRAPHENETX = "grblktx";
 const char *GETGRAPHENETX = "getgrblktx";
 const char *GETGRAPHENE = "getgrblk";
+// Raptor 
+const char *GETRAPTORCODES = "getraptorcodes";
 // Dash message types
 const char *TXLOCKREQUEST="ix";
 const char *TXLOCKVOTE="txlvote";
@@ -136,6 +138,8 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::GRAPHENETX,
     NetMsgType::GETGRAPHENETX,
     NetMsgType::GETGRAPHENE,
+    // Raptor message types
+    NetMsgType::GETRAPTORCODES,
     // Dash message types
     // NOTE: do NOT include non-implmented here, we want them to be "Unknown command" in ProcessMessage()
     NetMsgType::TXLOCKREQUEST,

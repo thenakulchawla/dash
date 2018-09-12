@@ -523,8 +523,8 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += HelpMessageOpt("-limitdescendantsize=<n>", strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool descendants (default: %u).", DEFAULT_DESCENDANT_SIZE_LIMIT));
         strUsage += HelpMessageOpt("-bip9params=deployment:start:end", "Use given start/end times for specified BIP9 deployment (regtest-only)");
     }
-    std::string debugCategories = "addrman, alert, bench, cmpctblock, coindb, db, graphene, http, leveldb, libevent, lock, mempool, mempoolrej, net, proxy, prune, rand, reindex, rpc, selectcoins, tor, zmq, "
-                                  "dash (or specifically: gobject, instantsend, keepass, masternode, mnpayments, mnsync, privatesend, spork)"; // Don't translate these and qt below
+    std::string debugCategories = "addrman, alert, bench, cmpctblock, coindb, db, graphene, http, leveldb, libevent, lock, mempool, mempoolrej, net, proxy, prune, rand, reindex, rpc, selectcoins, tor, zmq, raptor, erasure, "
+                                  "dash (or specifically: gobject, instantsend, keepass, masternode, mnpayments, mnsync, privatesend, shard,spork)"; // Don't translate these and qt below
     if (mode == HMM_BITCOIN_QT)
         debugCategories += ", qt";
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
@@ -1236,6 +1236,12 @@ bool AppInitParameterInteraction()
     if (GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS))
         nLocalServices = ServiceFlags(nLocalServices | NODE_GRAPHENE);
 
+    // if (GetBoolArg("use-shard-erasure", DEFAULT_USE_ERASURE))
+    //     nLocalServices = ServiceFlags(nLocalServices | NODE_SHARD_ERASURE);
+
+    if (GetBoolArg("use-raptor", DEFAULT_USE_RAPTOR))
+        nLocalServices = ServiceFlags(nLocalServices | NODE_RAPTOR);
+
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 
     fEnableReplacement = GetBoolArg("-mempoolreplacement", DEFAULT_ENABLE_REPLACEMENT);
@@ -1501,7 +1507,8 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
     fRelayTxes = !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
     fGrapheneBlockEnabled = GetBoolArg("-use-grapheneblocks", true);
-    LogPrint("graphene", "Enabled : %d\n", fGrapheneBlockEnabled);
+    // fShardErasureEnabled = GetBoolArg("-use-shard-erasure", true);
+    fRaptorEnabled = GetBoolArg("-use-raptor", true);
 
     if (fListen) {
         bool fBound = false;

@@ -612,6 +612,23 @@ void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
     vWhitelistedRange.push_back(subnet);
 }
 
+/**  Raptor Begin Section */
+bool CConnman::HaveRaptorNodes()
+{
+    {
+        LOCK(cs_vNodes);
+        for (CNode *pnode : vNodes)
+        {
+            if (pnode-> RaptorCapable());
+                return true;
+        }
+    }
+
+    return false;
+}
+
+/**  Raptor End Section */
+ 
 /** CConnman Graphene Begin Section */
 bool CConnman::ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
 {
@@ -723,8 +740,7 @@ void CConnman::CheckNodeSupportForGrapheneBlocks()
                 CNode* node = FindNode(strAddr);
                 if (node && !node->GrapheneCapable())
                 {
-                    LogPrintf("ERROR: You are trying to use connect-graphene but to a node that does not support it "
-                            "- Protocol Version: %d peer=%d\n",
+                    LogPrintf("ERROR: You are trying to use connect-graphene but to a node that does not support it - Protocol Version: %d peer=%d\n",
                             node->nVersion, node->id);
                 }
             }

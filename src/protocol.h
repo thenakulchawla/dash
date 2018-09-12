@@ -250,7 +250,7 @@ extern const char *BLOCKTXN;
  * "grapheneblock" message rather than an "inv", depending on message contents.
  * @since protocol version 70209 as described by BIP 152
  */
-extern const char *SENDGRAPHENE;
+// extern const char *SENDGRAPHENE;
 /**
  * Graphene: The grapheneblock message transmits a single serialized graphene block
  * */
@@ -267,6 +267,11 @@ extern const char *GETGRAPHENETX;
  * Graphene: The get_graphene message transmits a single serialized get_grblk
  * */
 extern const char *GETGRAPHENE;
+
+/** Raptor begin */
+extern const char *GETRAPTORCODES;
+/** Raptor end */
+
 
 
 // Dash message types
@@ -329,7 +334,14 @@ enum ServiceFlags : uint64_t {
 
     // NODE_GRAPHENE means that the node supports Graphene blocks
     // If this is turned off then the node will not service nor make graphene requests
+    
      NODE_GRAPHENE = (1 << 5),
+
+     // NODE_SHARD_ERASURE
+     NODE_SHARD_ERASURE = (1 << 6),
+     
+     // NODE_SHARD_RAPTOR
+     NODE_SHARD_RAPTOR = ( 1 << 7)
 };
 
 /** A CService with information about it as peer */
@@ -402,6 +414,9 @@ enum GetDataMsg {
     // Nodes may always request a MSG_GRAPHENE_BLOCK in a getdata, however,
     // MSG_GRAPHENE_BLOCK should not appear in any invs except as a part of getdata.
     MSG_GRAPHENE_BLOCK = 21,
+
+    // Get raptor codes
+    MSG_GET_RAPTOR_CODES = 22,
 };
 
 /** inv message data */

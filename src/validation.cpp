@@ -54,7 +54,6 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
 
-#include "jerasure/erasure_encode.h"
 #include <iomanip>
 
 #if defined(NDEBUG)
@@ -1263,40 +1262,6 @@ bool WriteBlockToDisk(const CBlock& block, CDiskBlockPos& pos, const CMessageHea
     fileout << block;
 
     return true;
-}
-
-bool CreateErasureFiles(boost::filesystem::path path)
-{
-	LOCK(cs_LastBlockFile);
-
-	// if (vinfoBlockFile[vinfoBlockFile.size()].nSize >= MIN_ERASURE_START && vinfoBlockFile[vinfoBlockFile.size()].nSize <= MAX_ERASURE_START)
-	// {
-        std::string tempFileName = path.filename().string();
-        std::string integerPart = tempFileName.substr(3,7);
-        int newFileNumberToAppend = stoi(integerPart) - 1;
-        std::stringstream ss;
-        ss << std::setw(5) << std::setfill('0') << newFileNumberToAppend;
-        std::string toAppend = ss.str();
-        std::string fileName1 = "blk" + toAppend + ".dat";
-        std::string fileName = path.parent_path().string() + "/" + fileName1;
-        char* fileNameToPass = &fileName[0u];
-        std::string filePath = path.parent_path().string();
-        char* filePathToPass = &filePath[0u];
-        unsigned int k = 11;
-        unsigned int m = 8;
-        char* codingType = "reed_sol_van";
-        unsigned int w = 8;
-        unsigned int packetsize = 0;
-        unsigned int buffersize = 0;
-        std::string dirPath = path.parent_path().string() + "/Coding";
-        // char* dirPathToPass = &dirPath[0u]; 
-        const char* dirPathToPass = dirPath.c_str(); 
-
-        bool isErasuresCreated = EncodeUsingErasure(dirPathToPass ,filePathToPass ,fileNameToPass , k, m, codingType, w, packetsize, buffersize );
-
-	return isErasuresCreated;
-
-
 }
 
 bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams)

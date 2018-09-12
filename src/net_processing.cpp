@@ -93,6 +93,11 @@ CStatMap statistics;
 bool fGrapheneBlockEnabled = true;
 /** Graphene end section */
 
+/** Raptor Section begin */
+// bool fShardErasureEnabled = true;
+bool fRaptorEnabled = true;
+/** Raptor Section end */
+
 // Internal stuff
 namespace {
     /** Number of nodes with fSyncStarted. */
@@ -1857,7 +1862,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, int64_t nTimeReceived, const CChainParams& chainparams, CConnman& connman, const std::atomic<bool>& interruptMsgProc)
 {
     LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
-    LogPrintf("received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+    // LogPrintf("received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
 
     if (IsArgSet("-dropmessagestest") && GetRand(GetArg("-dropmessagestest", 0)) == 0)
     {
@@ -2195,7 +2200,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         LOCK(cs_main);
         State(pfrom->GetId())->fPreferHeaders = true;
     }
-
 
     else if (strCommand == NetMsgType::SENDCMPCT)
     {
@@ -3117,7 +3121,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         // Can't download any more from this peer
                         break;
                     }
-                    if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom))
+                    if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom) && connman.HaveGrapheneNodes())
                     {
                         vGetData.push_back(CInv(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash()));
                         AddGrapheneBlockInFlight(pfrom, pindex->GetBlockHash());
@@ -3823,6 +3827,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             pfrom->pfilter = new CBloomFilter();
         }
         pfrom->fRelayTxes = true;
+    }
+
+    else if (strCommand == NetMsgType::GETRAPTORCODES)
+    {
     }
 
 
