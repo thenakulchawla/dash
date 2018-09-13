@@ -4521,15 +4521,15 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
             NodeId staller = -1;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
             BOOST_FOREACH(const CBlockIndex *pindex, vToDownload) {
-            LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
+            // LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
                 if (fGrapheneBlockEnabled && connman.HaveGrapheneNodes())
                 {
                     CInv inv2(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash());
                     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                     CBloomFilter filterMemPool;
 
-                    LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
-                    LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
+                    // LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
+                    // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
                     if (connman.HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(inv2.hash))
                     {
                         /* LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash)); */
@@ -4537,9 +4537,11 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                         // We can only request one graphene block per peer at a time.
                         if (pto->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pto))
                         {
-                            LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
+                            // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
                             // Instead of building a bloom filter here as we would for an xthin, we actually
                             // just need to fill in CMempoolInfo
+                            
+                            LogPrintf("SendMessages: Requesting graphene block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                             inv2.type = MSG_GRAPHENE_BLOCK;
                             CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
                             ss << inv2;
@@ -4550,8 +4552,8 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                             MarkBlockAsInFlight(pto->GetId(), inv2.hash, consensusParams, pindex);
                             AddGrapheneBlockInFlight(pto, inv2.hash);
                             connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETGRAPHENE, ss));
-                            LogPrint("graphene", "Requesting graphene block %s from peer %d\n", inv2.hash.ToString(),
-                                    pto->id);
+                            // LogPrint("graphene", "Requesting graphene block %s from peer %d\n", inv2.hash.ToString(),
+                                    // pto->id);
                             return true;
                         }
                     }
