@@ -2799,6 +2799,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 // so we just grab the block via normal getdata
                 std::vector<CInv> vInv(1);
                 vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
+                LogPrintf("Nakul Sending compact\n");
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
             }
             return true;
@@ -2837,6 +2838,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                     // Duplicate txindexes, the block is now in-flight, so just request it
                     std::vector<CInv> vInv(1);
                     vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
+                    LogPrintf("Nakul Sending compact\n");
                     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
                     return true;
                 }
@@ -2880,6 +2882,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 // mempool will probably be useless - request the block normally
                 std::vector<CInv> vInv(1);
                 vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
+                LogPrintf("Nakul Sending compact\n");
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
                 return true;
             } else {
@@ -2951,6 +2954,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 // Might have collided, fall back to getdata now :(
                 std::vector<CInv> invs;
                 invs.push_back(CInv(MSG_BLOCK, resp.blockhash));
+                LogPrintf("Nakul Sending MSG_BLOCK\n");
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, invs));
             } else {
                 // Block is either okay, or possibly we received
@@ -3153,6 +3157,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                             vGetData[0] = CInv(MSG_CMPCT_BLOCK, vGetData[0].hash);
                         }
                     }
+                    LogPrintf("Nakul Sending MSG_BLOCK GETDATA\n");
                     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
                 }
             }
@@ -3361,6 +3366,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             if (pindex->nChainWork <= chainActive.Tip()->nChainWork) {
                 std::vector<CInv> vGetData;
                 vGetData.push_back(inv);
+                LogPrintf("Nakul Sending MSG_BLOCK GETDATA full message graphen\n");
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
 
                 graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
@@ -3578,6 +3584,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
             std::vector<CInv> vGetData;
             vGetData.push_back(CInv(MSG_BLOCK, grapheneBlockTx.blockhash));
+                LogPrintf("Nakul Sending MSG_BLOCK GETDATA still missing transactions\n");
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
             return error("Still missing transactions after reconstructing block, peer=%d: re-requesting a full block", pfrom->id);
         }
@@ -4625,6 +4632,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         }
 
         if (!vGetData.empty()) {
+            LogPrintf("SendMessages: Nakul\n ");
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
             LogPrint("net", "SendMessages -- GETDATA -- pushed size = %lu peer=%d\n", vGetData.size(), pto->id);
         }

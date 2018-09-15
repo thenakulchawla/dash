@@ -598,28 +598,30 @@ bool IsGrapheneBlockEnabled()
 
 bool CanGrapheneBlockBeDownloaded(CNode *pto)
 {
-    if (pto->GrapheneCapable() && !GetBoolArg("-connect-graphene-force", false))
+    if (pto->GrapheneCapable())
         return true;
-    else if (pto->GrapheneCapable() && GetBoolArg("-connect-graphene-force", false))
-    {
-        // If connect-graphene-force is true then we have to check that this node is in fact a connect-graphene node.
-
-        // When -connect-graphene-force is true we will only download graphene blocks from a peer or peers that
-        // are using -connect-graphene=<ip>.  This is an undocumented setting used for setting up performance testing
-        // of graphene blocks, such as, going over the GFC and needing to have graphene blocks always come from the same
-        // peer or group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer
-        // to the peer that has invoked -connect-graphene.
-
-        // Check if this node is also a connect-graphene node
-        if (mapMultiArgs.count("-connect-graphene") > 0)
-        {
-            BOOST_FOREACH(const std::string &strAddrNode , mapMultiArgs.at("-connect-graphene") )
-            {
-                if (pto->GetAddrName() == strAddrNode) return true;
-            }
-        }
-    }
-
+    // if (pto->GrapheneCapable() && !GetBoolArg("-connect-graphene-force", false))
+    //     return true;
+    // else if (pto->GrapheneCapable() && GetBoolArg("-connect-graphene-force", false))
+    // {
+    //     // If connect-graphene-force is true then we have to check that this node is in fact a connect-graphene node.
+    //
+    //     // When -connect-graphene-force is true we will only download graphene blocks from a peer or peers that
+    //     // are using -connect-graphene=<ip>.  This is an undocumented setting used for setting up performance testing
+    //     // of graphene blocks, such as, going over the GFC and needing to have graphene blocks always come from the same
+    //     // peer or group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer
+    //     // to the peer that has invoked -connect-graphene.
+    //
+    //     // Check if this node is also a connect-graphene node
+    //     if (mapMultiArgs.count("-connect-graphene") > 0)
+    //     {
+    //         BOOST_FOREACH(const std::string &strAddrNode , mapMultiArgs.at("-connect-graphene") )
+    //         {
+    //             if (pto->GetAddrName() == strAddrNode) return true;
+    //         }
+    //     }
+    // }
+    //
     return false;
 }
 
