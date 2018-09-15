@@ -4521,24 +4521,24 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         // Message: getdata (blocks)
         //
 
-        LogPrintf("SendMessages: getdata for Nakul, fGrapheneEnabled: %d, fSyncStarted: %d, nSyncStarted: %d IsInitial: %d, haveGrapheneNodes: %d\n", fGrapheneBlockEnabled, state.fSyncStarted, nSyncStarted, IsInitialBlockDownload(), connman.HaveGrapheneNodes());
-        LogPrintf("pto->fClient: %d, fFetch: %d, IsInitialBlockDownload(): %d, state.nBlocksInFlight: %d, MAX_BLOCKS_IN_TRANSIT_PER_PEER: %d\n", pto->fClient, fFetch,IsInitialBlockDownload(), state.nBlocksInFlight, MAX_BLOCKS_IN_TRANSIT_PER_PEER);
+        // LogPrintf("SendMessages: getdata for Nakul, fGrapheneEnabled: %d, fSyncStarted: %d, nSyncStarted: %d IsInitial: %d, haveGrapheneNodes: %d\n", fGrapheneBlockEnabled, state.fSyncStarted, nSyncStarted, IsInitialBlockDownload(), connman.HaveGrapheneNodes());
+        // LogPrintf("pto->fClient: %d, fFetch: %d, IsInitialBlockDownload(): %d, state.nBlocksInFlight: %d, MAX_BLOCKS_IN_TRANSIT_PER_PEER: %d\n", pto->fClient, fFetch,IsInitialBlockDownload(), state.nBlocksInFlight, MAX_BLOCKS_IN_TRANSIT_PER_PEER);
         std::vector<CInv> vGetData;
         if (!pto->fClient && (fFetch || !IsInitialBlockDownload()) && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             std::vector<const CBlockIndex*> vToDownload;
             NodeId staller = -1;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
-            LogPrintf("vToDownload: %d\n", vToDownload.size());
+            // LogPrintf("vToDownload: %d\n", vToDownload.size());
             BOOST_FOREACH(const CBlockIndex *pindex, vToDownload) {
-            LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
+            // LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
                 if (fGrapheneBlockEnabled && connman.HaveGrapheneNodes())
                 {
                     CInv inv2(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash());
                     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                     CBloomFilter filterMemPool;
 
-                    LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
-                    LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
+                    // LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
+                    // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
                     LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
                     if (connman.HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(inv2.hash))
                     {
@@ -4550,7 +4550,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                             // Instead of building a bloom filter here as we would for an xthin, we actually
                             // just need to fill in CMempoolInfo
                             
-                            LogPrintf("SendMessages: Requesting graphene block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
+                            // LogPrintf("SendMessages: Requesting graphene block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                             inv2.type = MSG_GRAPHENE_BLOCK;
                             CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
                             ss << inv2;
@@ -4590,7 +4590,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                 }
                 else
                 {
-                    LogPrintf("SendMessages: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
+                    // LogPrintf("SendMessages: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                     vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
                     MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
                     LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
