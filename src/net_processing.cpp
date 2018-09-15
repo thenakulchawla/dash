@@ -1846,7 +1846,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
     // Update run-time statistics of graphene block bandwidth savings
     graphenedata.UpdateInBound(pfrom->nSizeGrapheneBlock, blockSize);
     LogPrint("Graphene", "Graphene block stats: %s\n", graphenedata.ToString().c_str());
-    CInv inv(MSG_BLOCK, grapheneBlock.header.GetHash());
+    CInv inv(MSG_GRAPHENE_BLOCK, grapheneBlock.header.GetHash());
 
     // Process the full block
     HandleGrapheneBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv, connman);
@@ -3295,7 +3295,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         }
 
         int nSizeGrapheneBlock = vRecv.size();
-        CInv inv(MSG_BLOCK, uint256());
+        CInv inv(MSG_GRAPHENE_BLOCK, uint256());
 
         CGrapheneBlock grapheneBlock;
         vRecv >> grapheneBlock;
@@ -3584,7 +3584,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         else
         {
             // We have all the transactions now that are in this block: try to reassemble and process.
-            CInv inv(CInv(MSG_BLOCK, grapheneBlockTx.blockhash));
+            CInv inv(CInv(MSG_GRAPHENE_BLOCK, grapheneBlockTx.blockhash));
 
             // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
             int nSizeGrapheneBlockTx = msgSize;
