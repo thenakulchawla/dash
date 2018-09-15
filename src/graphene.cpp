@@ -515,7 +515,7 @@ bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
         int64_t elapsed = GetTimeMillis() - mapGrapheneBlockTimer[hash];
         if (elapsed > nTimeToWait)
         {
-            LogPrint("graphene", "Preferential Graphene Block timer exceeded\n");
+            // LogPrint("graphene", "Preferential Graphene Block timer exceeded\n");
             return false;
         }
     }
@@ -529,7 +529,7 @@ void CGrapheneBlockData::ClearGrapheneBlockTimer(const uint256 &hash)
     if (mapGrapheneBlockTimer.count(hash))
     {
         mapGrapheneBlockTimer.erase(hash);
-        LogPrint("GRAPHENE", "Clearing Preferential Graphene Block timer\n");
+        LogPrint("graphene", "Clearing Preferential Graphene Block timer\n");
     }
 }
 
