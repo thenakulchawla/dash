@@ -9,6 +9,7 @@
 #include "netmessagemaker.h"
 #include "policy/policy.h"
 #include "pow.h"
+#include "random.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "util.h"
@@ -486,21 +487,35 @@ std::string CGrapheneBlockData::MempoolLimiterBytesSavedToString()
 // announcement from an GRAPHENE node then we just download a full block instead of a graphene block.
 bool CGrapheneBlockData::CheckGrapheneBlockTimer(const uint256 &hash)
 {
+    // Base time used to calculate the random timeout value.
+    static int64_t nTimeToWait = 10000;
+
     LOCK(cs_mapGrapheneBlockTimer);
     if (!mapGrapheneBlockTimer.count(hash))
     {
-        mapGrapheneBlockTimer[hash] = GetTimeMillis();
-        LogPrint("GRAPHENE", "Starting Preferential Graphene Block timer\n");
+        // The timeout limit is a random number betwee 8 and 12 seconds.
+        // This way a node connected to this one may download the block
+        // before the other node and thus be able to serve the other with
+        // a graphene block, rather than both nodes timing out and downloading
+        // a thinblock instead. This can happen at the margins of the BU network
+        // where we receive full blocks from peers that don't support graphene.
+        //
+        // To make the timeout random we adjust the start time of the timer forward
+        // or backward by a random amount plus or minus 2 seconds.
+        FastRandomContext insecure_rand(false);
+        uint64_t nOffset = nTimeToWait - (8000 + (insecure_rand.rand32() % 4000) + 1);
+        mapGrapheneBlockTimer[hash] = GetTimeMillis() + nOffset;
+        LogPrint("graphene", "Starting Preferential Graphene Block timer (%d millis)\n", nTimeToWait + nOffset);
     }
     else
     {
-        // Check that we have not exceeded the 10 second limit.
+        // Check that we have not exceeded time limit.
         // If we have then we want to return false so that we can
         // proceed to download a regular block instead.
-        uint64_t elapsed = GetTimeMillis() - mapGrapheneBlockTimer[hash];
-        if (elapsed > 10000)
+        int64_t elapsed = GetTimeMillis() - mapGrapheneBlockTimer[hash];
+        if (elapsed > nTimeToWait)
         {
-            LogPrint("GRAPHENE", "Preferential Graphene Block timer exceeded - downloading regular block instead\n");
+            // LogPrint("graphene", "Preferential Graphene Block timer exceeded\n");
             return false;
         }
     }
@@ -514,7 +529,7 @@ void CGrapheneBlockData::ClearGrapheneBlockTimer(const uint256 &hash)
     if (mapGrapheneBlockTimer.count(hash))
     {
         mapGrapheneBlockTimer.erase(hash);
-        LogPrint("GRAPHENE", "Clearing Preferential Graphene Block timer\n");
+        LogPrint("graphene", "Clearing Preferential Graphene Block timer\n");
     }
 }
 
@@ -598,28 +613,30 @@ bool IsGrapheneBlockEnabled()
 
 bool CanGrapheneBlockBeDownloaded(CNode *pto)
 {
-    if (pto->GrapheneCapable() && !GetBoolArg("-connect-graphene-force", false))
+    if (pto->GrapheneCapable())
         return true;
-    else if (pto->GrapheneCapable() && GetBoolArg("-connect-graphene-force", false))
-    {
-        // If connect-graphene-force is true then we have to check that this node is in fact a connect-graphene node.
-
-        // When -connect-graphene-force is true we will only download graphene blocks from a peer or peers that
-        // are using -connect-graphene=<ip>.  This is an undocumented setting used for setting up performance testing
-        // of graphene blocks, such as, going over the GFC and needing to have graphene blocks always come from the same
-        // peer or group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer
-        // to the peer that has invoked -connect-graphene.
-
-        // Check if this node is also a connect-graphene node
-        if (mapMultiArgs.count("-connect-graphene") > 0)
-        {
-            BOOST_FOREACH(const std::string &strAddrNode , mapMultiArgs.at("-connect-graphene") )
-            {
-                if (pto->GetAddrName() == strAddrNode) return true;
-            }
-        }
-    }
-
+    // if (pto->GrapheneCapable() && !GetBoolArg("-connect-graphene-force", false))
+    //     return true;
+    // else if (pto->GrapheneCapable() && GetBoolArg("-connect-graphene-force", false))
+    // {
+    //     // If connect-graphene-force is true then we have to check that this node is in fact a connect-graphene node.
+    //
+    //     // When -connect-graphene-force is true we will only download graphene blocks from a peer or peers that
+    //     // are using -connect-graphene=<ip>.  This is an undocumented setting used for setting up performance testing
+    //     // of graphene blocks, such as, going over the GFC and needing to have graphene blocks always come from the same
+    //     // peer or group of peers.  Also, this is a one way street.  Graphene blocks will flow ONLY from the remote peer
+    //     // to the peer that has invoked -connect-graphene.
+    //
+    //     // Check if this node is also a connect-graphene node
+    //     if (mapMultiArgs.count("-connect-graphene") > 0)
+    //     {
+    //         BOOST_FOREACH(const std::string &strAddrNode , mapMultiArgs.at("-connect-graphene") )
+    //         {
+    //             if (pto->GetAddrName() == strAddrNode) return true;
+    //         }
+    //     }
+    // }
+    //
     return false;
 }
 

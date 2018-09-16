@@ -19,6 +19,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "version.h"
+#include "graphene.h"
 
 #include <boost/foreach.hpp>
 
@@ -369,6 +370,28 @@ UniValue getnettotals(const JSONRPCRequest& request)
     return obj;
 }
 
+static UniValue GetGrapheneStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsGrapheneBlockEnabled();
+    obj.push_back(Pair("enabled", enabled));
+    if (enabled)
+    {
+        obj.push_back(Pair("summary", graphenedata.ToString()));
+        obj.push_back(Pair("inbound_percent", graphenedata.InBoundPercentToString()));
+        obj.push_back(Pair("outbound_percent", graphenedata.OutBoundPercentToString()));
+        obj.push_back(Pair("response_time", graphenedata.ResponseTimeToString()));
+        obj.push_back(Pair("validation_time", graphenedata.ValidationTimeToString()));
+        obj.push_back(Pair("filter", graphenedata.FilterToString()));
+        obj.push_back(Pair("iblt", graphenedata.IbltToString()));
+        obj.push_back(Pair("rank", graphenedata.RankToString()));
+        obj.push_back(Pair("graphene_block_size", graphenedata.GrapheneBlockToString()));
+        obj.push_back(Pair("graphene_additional_tx_size", graphenedata.AdditionalTxToString()));
+        obj.push_back(Pair("rerequested", graphenedata.ReRequestedTxToString()));
+    }
+    return obj;
+}
+
 static UniValue GetNetworksInfo()
 {
     UniValue networks(UniValue::VARR);
@@ -462,8 +485,24 @@ UniValue getnetworkinfo(const JSONRPCRequest& request)
         }
     }
     obj.push_back(Pair("localaddresses", localAddresses));
+    obj.push_back(Pair("grapheneblockstats", GetGrapheneStats()));
     obj.push_back(Pair("warnings",       GetWarnings("statusbar")));
     return obj;
+}
+
+UniValue clearblockstats(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw std::runtime_error("clearblockstats\n"
+                            "\nClears statistics related to compression blocks graphene.\n"
+                            "\nArguments: None\n"
+                            "\nExample:\n" +
+                            HelpExampleCli("clearblockstats", ""));
+
+    if (IsGrapheneBlockEnabled())
+        graphenedata.ClearGrapheneBlockStats();
+
+    return NullUniValue;
 }
 
 UniValue setban(const JSONRPCRequest& request)
@@ -616,6 +655,7 @@ static const CRPCCommand commands[] =
     { "network",            "listbanned",             &listbanned,             true,  {} },
     { "network",            "clearbanned",            &clearbanned,            true,  {} },
     { "network",            "setnetworkactive",       &setnetworkactive,       true,  {"state"} },
+    // {"network", "clearblockstats", &clearblockstats, true, {} },
 };
 
 void RegisterNetRPCCommands(CRPCTable &t)

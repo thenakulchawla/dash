@@ -1377,7 +1377,13 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
             {
                 graphenedata.UpdateOutBound(nSizeGrapheneBlock, nSizeBlock);
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GRAPHENEBLOCK, grapheneBlock));
-                LogPrint("GRAPHENE", "Sent graphene block - size: %d vs block size: %d => peer: %d\n", nSizeGrapheneBlock,
+                LogPrint("graphene", "Filter bytes: %d, Iblt bytes: %d, Rank bytes: %d, AddTx: %d\n",
+                        grapheneBlock.pGrapheneSet->GetFilterSerializationSize(),
+                        grapheneBlock.pGrapheneSet->GetIbltSerializationSize(),
+                        grapheneBlock.pGrapheneSet->GetRankSerializationSize(),
+                        grapheneBlock.GetAdditionalTxSerializationSize());
+
+                LogPrint("graphene", "Sent graphene block - size: %d vs block size: %d => peer: %d\n", nSizeGrapheneBlock,
                     nSizeBlock, pfrom->id);
 
                 graphenedata.UpdateFilter(grapheneBlock.pGrapheneSet->GetFilterSerializationSize());
@@ -1640,8 +1646,9 @@ void HandleGrapheneBlockMessage(CNode *pfrom, const std::string strCommand, CBlo
 }
 
 // TODO: request from the "best" txn source not necessarily from the block source
-bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand, CConnman& connman, CGrapheneBlock &grapheneBlock) 
+bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand, CConnman& connman, CGrapheneBlock& grapheneBlock) 
 {
+    // LogPrint("graphene", "processing graphene block");
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
 
     // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the graphene block
@@ -1765,7 +1772,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
             catch (const std::runtime_error &e)
             {
                 fRequestFailover = true;
-                LogPrint("Graphene", "Graphene set could not be reconciled; requesting failover for peer %d: %s\n",
+                LogPrint("graphene", "Graphene set could not be reconciled; requesting failover for peer %d: %s\n",
                         pfrom->id, e.what());
 
                 graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
@@ -1787,7 +1794,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
             }
         }
     } // End locking cs_orphancache, mempool.cs and cs_xval
-    LogPrint("Graphene", "Total in-memory graphene bytes size is %ld bytes\n", graphenedata.GetGrapheneBlockBytes());
+    LogPrint("graphene", "Total in-memory graphene bytes size is %ld bytes\n", graphenedata.GetGrapheneBlockBytes());
 
     // This must be checked outside of the above section or deadlock may occur.
     if (fRequestFailover)
@@ -1816,7 +1823,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
     }
 
     pfrom->grapheneBlockWaitingForTxns = missingCount;
-    LogPrint("Graphene", "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
+    LogPrint("graphene", "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
             pfrom->grapheneBlockWaitingForTxns, unnecessaryCount, pfrom->grapheneBlock.vtx.size(),
             pfrom->mapMissingTx.size());
 
@@ -1830,6 +1837,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 
         // Update run-time statistics of graphene block bandwidth savings
         graphenedata.UpdateInBoundReRequestedTx(pfrom->grapheneBlockWaitingForTxns);
+        LogPrint("graphene", "XThin rerequest tx size: %d\n", ::GetSerializeSize(pfrom->grapheneBlockWaitingForTxns, SER_NETWORK, PROTOCOL_VERSION));
 
         return true;
     }
@@ -1848,15 +1856,15 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
     // We now have all the transactions that are in this block
     pfrom->grapheneBlockWaitingForTxns = -1;
     int blockSize = ::GetSerializeSize(pfrom->grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
-    LogPrint("Graphene",
+    LogPrint("graphene",
             "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%d\n",
             pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock,
             ((float)blockSize) / ((float)pfrom->nSizeGrapheneBlock), pfrom->id);
 
     // Update run-time statistics of graphene block bandwidth savings
     graphenedata.UpdateInBound(pfrom->nSizeGrapheneBlock, blockSize);
-    LogPrint("Graphene", "Graphene block stats: %s\n", graphenedata.ToString().c_str());
-    CInv inv(MSG_BLOCK, grapheneBlock.header.GetHash());
+    LogPrint("graphene", "Graphene block stats: %s\n", graphenedata.ToString().c_str());
+    CInv inv(MSG_GRAPHENE_BLOCK, grapheneBlock.header.GetHash());
 
     // Process the full block
     HandleGrapheneBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv, connman);
@@ -1867,7 +1875,6 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, int64_t nTimeReceived, const CChainParams& chainparams, CConnman& connman, const std::atomic<bool>& interruptMsgProc)
 {
     LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
-    // LogPrintf("received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
 
     if (IsArgSet("-dropmessagestest") && GetRand(GetArg("-dropmessagestest", 0)) == 0)
     {
@@ -2123,14 +2130,12 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // cmpctblock messages.
             // We send this to non-NODE NETWORK peers as well, because
             // they may wish to request compact blocks from us
-           LogPrintf("Compact Enabled net_processing.cpp \n");
             bool fAnnounceUsingCMPCTBLOCK = false;
             uint64_t nCMPCTBLOCKVersion = 1;
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
         }
 
        if (pfrom->nVersion >= GRAPHENE_BLOCK_VERSION){
-           LogPrintf("Graphene Enabled net_processing.cpp: %d\n", fGrapheneBlockEnabled);
            fGrapheneBlockEnabled = true;
            // Tell our peer we are willing to provide version-1 graphene
            // However, we do not request new block announcements using
@@ -2359,7 +2364,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             pindex = chainActive.Next(pindex);
         int nLimit = 500;
         LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), nLimit, pfrom->id);
-        LogPrintf( "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), nLimit, pfrom->id);
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             if (pindex->GetBlockHash() == hashStop)
@@ -2965,6 +2969,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 // Might have collided, fall back to getdata now :(
                 std::vector<CInv> invs;
                 invs.push_back(CInv(MSG_BLOCK, resp.blockhash));
+                LogPrintf("Nakul Sending MSG_BLOCK\n");
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, invs));
             } else {
                 // Block is either okay, or possibly we received
@@ -3155,7 +3160,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
                 if (vGetData.size() > 0) {
                     if (nodestate->fSupportsDesiredCmpctVersion && vGetData.size() == 1 && mapBlocksInFlight.size() == 1 && pindexLast->pprev->IsValid(BLOCK_VALID_CHAIN)) {
-                        if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom))
+                        if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom) && connman.HaveGrapheneNodes())
                         {
                             // In any case, we want to download using a graphene block, not a regular one
                             vGetData[0] = CInv(MSG_GRAPHENE_BLOCK, vGetData[0].hash);
@@ -3234,6 +3239,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
     else if (strCommand == NetMsgType::GETGRAPHENE && !fImporting && !fReindex && fGrapheneBlockEnabled)
     {
+        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
         if (!pfrom->GrapheneCapable())
         {
             Misbehaving(pfrom->GetId(), 100);
@@ -3249,7 +3255,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         pfrom->nGetGrapheneCount *= std::pow(1.0 - 1.0 / 150.0, (double)(nNow - pfrom->nGetGrapheneLastTime));
         pfrom->nGetGrapheneLastTime = nNow;
         pfrom->nGetGrapheneCount += 1;
-        LogPrint("Graphene", "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
+        LogPrint("graphene", "nGetGrapheneCount is %f\n", pfrom->nGetGrapheneCount);
         if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
         {
             if (pfrom->nGetGrapheneCount >= 20)
@@ -3302,6 +3308,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              fGrapheneBlockEnabled)
     {
+        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
         if (!pfrom->GrapheneCapable())
         {
             Misbehaving(pfrom->GetId(), 5);
@@ -3309,7 +3316,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         }
 
         int nSizeGrapheneBlock = vRecv.size();
-        CInv inv(MSG_BLOCK, uint256());
+        CInv inv(MSG_GRAPHENE_BLOCK, uint256());
 
         CGrapheneBlock grapheneBlock;
         vRecv >> grapheneBlock;
@@ -3366,7 +3373,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 // AlreadyReceived(inv);
 
                 graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
-                LogPrint("GRAPHENE","Received graphene block but returning because we already have block data %s from peer %d size %d bytes\n",
+                LogPrint("graphene","Received graphene block but returning because we already have block data %s from peer %d size %d bytes\n",
                          inv.hash.ToString(), pfrom->id, nSizeGrapheneBlock);
                 return true;
             }
@@ -3385,7 +3392,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
 
             {
-                LogPrint("GRAPHENE", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
+                LogPrint("graphene", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
                          pfrom->id, nSizeGrapheneBlock);
 
                 // Do not process unrequested grapheneblocks.
@@ -3407,6 +3414,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
     else if (strCommand == NetMsgType::GETGRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              fGrapheneBlockEnabled)
     {
+        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
         if (!pfrom->GrapheneCapable())
         {
             Misbehaving(pfrom->GetId(), 100);
@@ -3426,7 +3434,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         // We use MSG_TX here even though we refer to blockhash because we need to track
         // how many grblocktx requests we make in case of DOS
         CInv inv(MSG_TX, grapheneRequestBlockTx.blockhash);
-        LogPrint("GRAPHENE", "Received get_grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->id);
+        LogPrint("graphene", "Received get_grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->id);
 
         // Check for Misbehaving and DOS
         // If they make more than 20 requests in 2.5  minutes then disconnect them
@@ -3479,6 +3487,8 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
             CGrapheneBlockTx grapheneBlockTx(grapheneRequestBlockTx.blockhash, vTx);
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GRAPHENETX, grapheneBlockTx));
+            LogPrint("graphene", "Graphene rerequest tx size: %d\n",::GetSerializeSize(grapheneBlockTx, SER_NETWORK, PROTOCOL_VERSION));
+
         }
 
 
@@ -3489,6 +3499,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
         fGrapheneBlockEnabled)
     {
+        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
         if (!pfrom->GrapheneCapable())
         {
             Misbehaving(pfrom->GetId(), 100);
@@ -3598,12 +3609,12 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         else
         {
             // We have all the transactions now that are in this block: try to reassemble and process.
-            CInv inv(CInv(MSG_BLOCK, grapheneBlockTx.blockhash));
+            CInv inv(CInv(MSG_GRAPHENE_BLOCK, grapheneBlockTx.blockhash));
 
             // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
             int nSizeGrapheneBlockTx = msgSize;
             int blockSize = ::GetSerializeSize(pfrom->grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
-            LogPrint("GRAPHENE", "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
+            LogPrint("graphene", "Reassembled xblocktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
                     "(re-requested tx), compression ratio %3.2f, peer=%d\n",
                     pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nSizeGrapheneBlockTx,
                     ((float)blockSize) / ((float)pfrom->nSizeGrapheneBlock + (float)nSizeGrapheneBlockTx), pfrom->GetLogName());
@@ -3612,7 +3623,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // We add the original graphene block size with the size of transactions that were re-requested.
             // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
             graphenedata.UpdateInBound(nSizeGrapheneBlockTx + pfrom->nSizeGrapheneBlock, blockSize);
-            LogPrint("GRAPHENE", "Graphene block stats: %s\n", graphenedata.ToString());
+            LogPrint("graphene", "Graphene block stats: %s\n", graphenedata.ToString());
 
             // PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv);
             HandleGrapheneBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv, connman);
@@ -4272,8 +4283,6 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                 }
             }
 
-            // LogPrintf("fRevertToInv: %d\n " ,fRevertToInv);
-
             if (!fRevertToInv && !vHeaders.empty()) {
                 if (vHeaders.size() == 1 && state.fPreferHeaderAndIDs) {
                     // We only send up to 1 block as header-and-ids, as otherwise
@@ -4538,32 +4547,35 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         // Message: getdata (blocks)
         //
 
-        // LogPrintf("SendMessages: getdata for Nakul, fGrapheneEnabled: %d, fSyncStarted: %d, nSyncStarted: %d\n", fGrapheneBlockEnabled, state.fSyncStarted, nSyncStarted);
+        // LogPrintf("SendMessages: getdata for Nakul, fGrapheneEnabled: %d, fSyncStarted: %d, nSyncStarted: %d IsInitial: %d, haveGrapheneNodes: %d\n", fGrapheneBlockEnabled, state.fSyncStarted, nSyncStarted, IsInitialBlockDownload(), connman.HaveGrapheneNodes());
+        // LogPrintf("pto->fClient: %d, fFetch: %d, IsInitialBlockDownload(): %d, state.nBlocksInFlight: %d, MAX_BLOCKS_IN_TRANSIT_PER_PEER: %d\n", pto->fClient, fFetch,IsInitialBlockDownload(), state.nBlocksInFlight, MAX_BLOCKS_IN_TRANSIT_PER_PEER);
         std::vector<CInv> vGetData;
         if (!pto->fClient && (fFetch || !IsInitialBlockDownload()) && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             std::vector<const CBlockIndex*> vToDownload;
             NodeId staller = -1;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
             BOOST_FOREACH(const CBlockIndex *pindex, vToDownload) {
-            LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
+            // LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
                 if (fGrapheneBlockEnabled && connman.HaveGrapheneNodes())
                 {
                     CInv inv2(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash());
                     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                     CBloomFilter filterMemPool;
 
-                    LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
-                    LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
+                    // LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
+                    // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
+                    // LogPrint("graphene","SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
                     if (connman.HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(inv2.hash))
                     {
-                        /* LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash)); */
+                        // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
                         // Must download a graphene block from a graphene enabled peer.
                         // We can only request one graphene block per peer at a time.
                         if (pto->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pto))
                         {
-                            LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
                             // Instead of building a bloom filter here as we would for an xthin, we actually
                             // just need to fill in CMempoolInfo
+                            
+                            // LogPrintf("SendMessages: Requesting graphene block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                             inv2.type = MSG_GRAPHENE_BLOCK;
                             CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
                             ss << inv2;
@@ -4608,7 +4620,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                 }
                 else
                 {
-                    LogPrintf("SendMessages: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
+                    // LogPrintf("SendMessages: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                     vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
                     MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
                     LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
