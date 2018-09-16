@@ -21,6 +21,7 @@
 #include <tuple>
 #include <vector>
 #include "serialize.h"
+#include "primitives/block.h"
 #include "RaptorQ/RaptorQ_v1_hdr.hpp"
 
 
@@ -35,7 +36,12 @@ private:
     std::vector<uint8_t> vEncoded;
 
 public:
+    CBlockHeader header;
+    std::vector<CTransactionRef> vBlockTxs;
+
+public:
     CRaptorSymbol();
+    CRaptorSymbol(const CBlockRef pblock);
     ~CRaptorSymbol();
 
     ADD_SERIALIZE_METHODS;
@@ -48,25 +54,7 @@ public:
 
 };
 
-// class CRaptorDecodeSymbol
-// {
-// public:
-//     CRaptorDecodeSymbol();
-//     CRaptorDecodeSymbol(const uint32_t nSize, const uint8_t nOverhead);
-//
-//     ADD_SERIALIZE_METHODS;
-//
-//     template <typename Stream, typename Operation>
-//     inline void SerializationOp(Stream &s, Operation ser_action)
-//     {
-//         READWRITE(nSize, nOverhead);
-//     }
-//
-// private:
-//     uint32_t nSize;
-//     uint8_t nOverhead;
-//
-// };
+bool encode(const CBlockRef pblock, std::vector<uint8_t>& vEncoded);
 
 template <typename T>
 inline void pack (std::vector< uint8_t >& dst, T& data);

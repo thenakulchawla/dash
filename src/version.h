@@ -42,12 +42,12 @@ static const int SENDHEADERS_VERSION = 70201;
 static const int DIP0001_PROTOCOL_VERSION = 70208;
 
 //! short-id-based block download starts with this version
-static const int SHORT_IDS_BLOCKS_VERSION = 70209;
+static const int SHORT_IDS_BLOCKS_VERSION = 70309; // change it to 70209 later
 
 //! Graphene (bloom filter and IBLT) based download starts with this version
-static const int GRAPHENE_BLOCK_VERSION = 70301;
+static const int GRAPHENE_BLOCK_VERSION = 70401; // change it to 70301 later
 
 //! Sharding of blockchain starts with this version
-static const int NODE_RAPTOR = 70302;
+static const int RAPTOR_VERSION = 70302;
 
 #endif // BITCOIN_VERSION_H

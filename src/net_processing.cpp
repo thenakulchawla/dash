@@ -158,6 +158,9 @@ namespace {
     MapRelay mapRelay;
     /** Expiration-time ordered list of (expire time, relay map entry) pairs, protected by cs_main). */
     std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
+
+
+    /** Raptor  */
 } // anon namespace
 
 //////////////////////////////////////////////////////////////////////////////
@@ -449,7 +452,6 @@ void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman& connman) {
                 // blocks using compact encodings.
                 connman.ForNode(lNodesAnnouncingHeaderAndIDs.front(), [&connman, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion](CNode* pnodeStop){
                     connman.PushMessage(pnodeStop, CNetMsgMaker(pnodeStop->GetSendVersion()).Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
-                    LogPrintf("fAnnounceUsingCMPCTBLOCK _1_: %d\n", fAnnounceUsingCMPCTBLOCK);
                     return true;
                 });
                 lNodesAnnouncingHeaderAndIDs.pop_front();
@@ -457,7 +459,6 @@ void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman& connman) {
             fAnnounceUsingCMPCTBLOCK = true;
             connman.PushMessage(pfrom, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
             lNodesAnnouncingHeaderAndIDs.push_back(pfrom->GetId());
-            LogPrintf("fAnnounceUsingCMPCTBLOCK _2_: %d\n", fAnnounceUsingCMPCTBLOCK);
             return true;
         });
     }
@@ -1149,6 +1150,10 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
 			LogPrint("GRAPHENE", "Sending graphene block by INV queue getdata message\n");
 			SendGrapheneBlock(MakeBlockRef(block), pfrom, inv, connman);
 		    }
+                    else if (inv.type == MSG_RAPTOR_CODES)
+                    {
+                        LogPrint("raptor", "Sending Raptor Symbols by INV queue getdata message\n");
+                    }
 
 
                     // Trigger the peer node to send a getblocks request for the next batch of inventory
@@ -2136,6 +2141,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
            /* uint64_t nGRAPHENEBLOCKVersion = 1; */
            // connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::SENDGRAPHENE, fAnnounceUsingGRAPHENEBLOCK, nGRAPHENEBLOCKVersion));
 
+       }
+
+       if (pfrom->nVersion >= RAPTOR_VERSION){
+           LogPrintf("Raptor enabled net_processing: %d\n", fRaptorEnabled);
+           fRaptorEnabled = true;
        }
 
         pfrom->fSuccessfullyConnected = true;
@@ -3834,6 +3844,11 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
     }
 
+    else if (strCommand == NetMsgType::RAPTORCODESYMBOL)
+    {
+
+    }
+
 
     else if (strCommand == NetMsgType::NOTFOUND) {
         // We do not care about the NOTFOUND message, but logging an Unknown Command
@@ -4586,6 +4601,11 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                     }
 
                 }
+                else if ( fRaptorEnabled && connman.HaveRaptorNodes() )
+                {
+                    LogPrintf("SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
+
+                }
                 else
                 {
                     LogPrintf("SendMessages: Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
@@ -4595,6 +4615,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                             pindex->nHeight, pto->id);
 
                 }
+                // if raptor enabled, send this(MSG_RAPTOR_CODE) message to all nodes(peers)
             }
             if (state.nBlocksInFlight == 0 && staller != -1) {
                 if (State(staller)->nStallingSince == 0) {

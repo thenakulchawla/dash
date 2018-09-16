@@ -5,9 +5,8 @@
 #include "alert.h"
 #include "chain.h"
 #include "chainparams.h"
-#include "hash.h"
-#include "primitives/block.h"
-#include "primitives/transaction.h"
+// #include "primitives/block.h"
+// #include "primitives/transaction.h"
 
 
 // #include <boost/spirit/include/classic_core.hpp>
@@ -17,10 +16,18 @@
 
 namespace RaptorQ = RaptorQ__v1;
 
-CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>();}
+CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>(); }
 
 CRaptorSymbol::~CRaptorSymbol()
 {
+}
+
+CRaptorSymbol::CRaptorSymbol(const CBlockRef pblock)
+{
+    header = pblock->GetBlockHeader();
+    vBlockTxs = pblock->vtx;
+
+    encode(pblock, vEncoded);
 }
 
 template <typename T>
@@ -35,6 +42,12 @@ inline void unpack (std::vector <uint8_t >& src, int index, T& data) {
     copy (&src[index], &src[index + sizeof (T)], &data);
 }
 
+bool encode (const CBlockRef pblock, std::vector<uint8_t>& vEncoded)
+{
+    return true;
+
+}
+
 bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probability, const uint8_t overhead)
 {
     CBlockIndex* current_block = chainActive.Tip(); 
@@ -46,6 +59,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
 
     pack (input, cBlock);
 
+    // symbol size in bytes
     const uint16_t symbol_size = 16;
 
     // how many symbols do we need to encode all our input in a single block?

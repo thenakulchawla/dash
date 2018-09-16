@@ -270,6 +270,7 @@ extern const char *GETGRAPHENE;
 
 /** Raptor begin */
 extern const char *GETRAPTORCODES;
+extern const char *RAPTORCODESYMBOL;
 /** Raptor end */
 
 
@@ -337,11 +338,8 @@ enum ServiceFlags : uint64_t {
     
      NODE_GRAPHENE = (1 << 5),
 
-     // NODE_SHARD_ERASURE
-     NODE_SHARD_ERASURE = (1 << 6),
-     
-     // NODE_SHARD_RAPTOR
-     NODE_SHARD_RAPTOR = ( 1 << 7)
+     // NODE_RAPTOR
+     NODE_RAPTOR = ( 1 << 6)
 };
 
 /** A CService with information about it as peer */
@@ -416,7 +414,7 @@ enum GetDataMsg {
     MSG_GRAPHENE_BLOCK = 21,
 
     // Get raptor codes
-    MSG_GET_RAPTOR_CODES = 22,
+    MSG_RAPTOR_CODES = 22,
 };
 
 /** inv message data */
