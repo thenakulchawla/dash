@@ -1365,6 +1365,12 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
             {
                 graphenedata.UpdateOutBound(nSizeGrapheneBlock, nSizeBlock);
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GRAPHENEBLOCK, grapheneBlock));
+                LogPrint("graphene", "Filter bytes: %d, Iblt bytes: %d, Rank bytes: %d, AddTx: %d\n",
+                        grapheneBlock.pGrapheneSet->GetFilterSerializationSize(),
+                        grapheneBlock.pGrapheneSet->GetIbltSerializationSize(),
+                        grapheneBlock.pGrapheneSet->GetRankSerializationSize(),
+                        grapheneBlock.GetAdditionalTxSerializationSize());
+
                 LogPrint("graphene", "Sent graphene block - size: %d vs block size: %d => peer: %d\n", nSizeGrapheneBlock,
                     nSizeBlock, pfrom->id);
 
@@ -1630,7 +1636,7 @@ void HandleGrapheneBlockMessage(CNode *pfrom, const std::string strCommand, CBlo
 // TODO: request from the "best" txn source not necessarily from the block source
 bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand, CConnman& connman, CGrapheneBlock& grapheneBlock) 
 {
-    LogPrint("graphene", "processing graphene block");
+    // LogPrint("graphene", "processing graphene block");
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
 
     // Xpress Validation - only perform xval if the chaintip matches the last blockhash in the graphene block
@@ -1819,6 +1825,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 
         // Update run-time statistics of graphene block bandwidth savings
         graphenedata.UpdateInBoundReRequestedTx(pfrom->grapheneBlockWaitingForTxns);
+        LogPrint("graphene", "XThin rerequest tx size: %d\n", ::GetSerializeSize(pfrom->grapheneBlockWaitingForTxns, SER_NETWORK, PROTOCOL_VERSION));
 
         return true;
     }
@@ -3464,6 +3471,8 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
             CGrapheneBlockTx grapheneBlockTx(grapheneRequestBlockTx.blockhash, vTx);
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GRAPHENETX, grapheneBlockTx));
+            LogPrint("graphene", "Graphene rerequest tx size: %d\n",::GetSerializeSize(grapheneBlockTx, SER_NETWORK, PROTOCOL_VERSION));
+
         }
 
 
