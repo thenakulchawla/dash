@@ -6,6 +6,7 @@
 #define BITCOIN_RAPTOR_ENCODING_H
 
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <chrono>
 #include <cstdio>
@@ -20,6 +21,11 @@
 #include <thread>
 #include <tuple>
 #include <vector>
+#include "util.h"
+#include "utiltime.h"
+#include "stat.h"
+#include "sync.h"
+#include "uint256.h"
 #include "serialize.h"
 #include "primitives/block.h"
 #include "RaptorQ/RaptorQ_v1_hdr.hpp"
@@ -28,6 +34,8 @@
 extern bool fRaptorEnabled;
 
 class CDataStream;
+class CNode;
+class CConnman;
 
 
 class CRaptorSymbol
@@ -41,7 +49,7 @@ public:
 
 public:
     CRaptorSymbol();
-    CRaptorSymbol(const CBlockRef pblock);
+    CRaptorSymbol(const CBlock pblock);
     ~CRaptorSymbol();
 
     ADD_SERIALIZE_METHODS;
@@ -54,10 +62,46 @@ public:
 
 };
 
-bool encode(const CBlockRef pblock, std::vector<uint8_t>& vEncoded);
+class CRaptorSymbolData
+{
+private:
+    std::atomic<uint64_t> nRaptorSymbolBytes{0};
+
+    CCriticalSection cs_mapRaptorSymbolTimer; // locks the below timer
+    std::map<uint256, uint64_t> mapRaptorSymbolTimer;
+    CCriticalSection cs_raptorstats; // locks everything below this point
+    
+    CStatHistory<uint64_t> nSymbolSize;
+    CStatHistory<uint64_t> nBlockSize;
+    CStatHistory<uint64_t> nInBoundSymbols;
+    CStatHistory<uint64_t> nOutBoundSymbols;
+    CStatHistory<uint64_t> nDecodeFailures;
+    CStatHistory<uint64_t> nTotalRaptorSymbolBytes;
+    std::map<int64_t, int64_t> mapRaptorResponseTime;
+    std::map<int64_t, int> mapRaptorSymbolValidationTime;
+
+    template <class T>
+    void updateStats(std::map<int64_t, T>& statsMap, T value);
+    template <class T>
+    void expireStats(std::map<int64_t, T>& statsMap);
+    double average(std::map<int64_t, uint64_t>& map);
+
+protected:
+    virtual int64_t getTimeForStats() { return GetTimeMillis();}
+
+public:
+    void IncrementDecodeFailures();
+
+    uint64_t AddRaptorSymbolBytes(uint64_t, CNode *pfrom);
+    uint64_t DeleteRaptorSymbolBytes(uint64_t, CNode *pfrom);
+
+};
+
+bool encode(const CBlock pblock, std::vector<uint8_t>& vEncoded);
+bool decode(std::vector<uint8_t>& vEncoded);
 
 template <typename T>
-inline void pack (std::vector< uint8_t >& dst, T& data);
+inline void pack (std::vector< uint8_t>& dst, T& data);
 
 
 template <typename T>

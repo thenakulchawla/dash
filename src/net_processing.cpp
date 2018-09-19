@@ -1030,6 +1030,8 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman& connma
 }
 
 inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman);
+// TODO: add pfrom, because reply is sent to one node not all
+inline void static SendRaptorSymbol(const CBlock pblock, const CInv &inv, CConnman& connman);
 
 void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParams, CConnman& connman, const std::atomic<bool>& interruptMsgProc)
 {
@@ -1147,12 +1149,13 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                     }
 		    else if (inv.type == MSG_GRAPHENE_BLOCK)
 		    {
-			LogPrint("GRAPHENE", "Sending graphene block by INV queue getdata message\n");
+			LogPrint("graphene", "Sending graphene block by INV queue getdata message\n");
 			SendGrapheneBlock(MakeBlockRef(block), pfrom, inv, connman);
 		    }
                     else if (inv.type == MSG_RAPTOR_CODES)
                     {
                         LogPrint("raptor", "Sending Raptor Symbols by INV queue getdata message\n");
+                        SendRaptorSymbol(block, inv, connman);
                     }
 
 
@@ -1346,6 +1349,13 @@ inline void static SendBlockTransactions(const CBlock& block, const BlockTransac
     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
+inline void static SendRaptorSymbol(const CBlock pblock, const CInv &inv, CConnman& connman)
+{
+    LogPrint("raptor","SendRaptorSymbol\n");
+
+    return;
+}
+
 inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
 {
     int64_t nReceiverMemPoolTx = pfrom->nGrapheneMemPoolTx;
@@ -1370,7 +1380,7 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
                 // send a regular block instead
             {
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, *pblock));
-                LogPrint("GRAPHENE", "Sent regular block instead - graphene block size: %d vs block size: %d => peer: %d\n",
+                LogPrint("graphene", "Sent regular block instead - graphene block size: %d vs block size: %d => peer: %d\n",
                     nSizeGrapheneBlock, nSizeBlock, pfrom->id);
             }
             else
@@ -1396,7 +1406,7 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
         catch (const std::runtime_error &e)
         {
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, *pblock));
-            LogPrint("GRAPHENE", "Sent regular block instead - encountered error when creating graphene block for peer %d: %s\n",
+            LogPrint("graphene", "Sent regular block instead - encountered error when creating graphene block for peer %d: %s\n",
                 pfrom->id, e.what());
         }
     }
@@ -1870,6 +1880,13 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
     HandleGrapheneBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv, connman);
 
     return true;
+}
+
+bool ProcessRaptorSymbol(CNode* pfrom, int nSizeRaptorSymbol, std::string strCommand, CConnman& connman, CRaptorSymbol& _symbol)
+{
+    LogPrint("raptor", "Processing raptor symbol\n");
+    return true;
+
 }
 
 bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStream& vRecv, int64_t nTimeReceived, const CChainParams& chainparams, CConnman& connman, const std::atomic<bool>& interruptMsgProc)
@@ -3634,6 +3651,180 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
     // Graphene section end
 
+    // Raptor Section begin
+
+    else if (strCommand == NetMsgType::GETRAPTORCODES)
+    {
+        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+        if (!pfrom->RaptorCapable())
+        {
+            Misbehaving(pfrom->id, 100);
+            return error("Raptor symbols being sent from non raptor node=%d", pfrom->id);
+
+        }
+
+        if (pfrom->nGetRaptorLastTime <=0)
+            pfrom->nGetRaptorLastTime = GetTime();
+
+        uint64_t nNow = GetTime();
+        
+        pfrom->nGetRaptorSymbolCount *= std::pow(1.0 -1.0 /150.0, (double)(nNow - pfrom->nGetRaptorLastTime));
+        pfrom->nGetRaptorLastTime = nNow;
+        pfrom->nGetRaptorSymbolCount +=1;
+        LogPrint("raptor", "nRaptorSymbolCount is %f\n", pfrom->nGetRaptorSymbolCount);
+        if (chainparams.NetworkIDString() == "main")
+        {
+            if (pfrom->nGetRaptorSymbolCount >= 20)
+            {
+                Misbehaving(pfrom->id, 100);
+                return error("Sending too many raptor requests");
+            }
+        }
+
+        CInv inv;
+        vRecv >> inv; // 
+
+        // update inbound raptor
+        
+        // Message consistency checking
+        if (!(inv.type == MSG_RAPTOR_CODES) || inv.hash.IsNull())
+        {
+	    Misbehaving(pfrom->id, 100);
+	    return error("invalid GETRAPTORCODES message type=%u hash=%s", inv.type, inv.hash.ToString());
+
+        }
+
+        CBlock block;
+        {
+            LOCK(cs_main);
+            BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
+            if (mi == mapBlockIndex.end())
+            {
+                Misbehaving(pfrom->id, 100);
+                return error("Peer %d requested nonexistent block %s", pfrom->id, inv.hash.ToString());
+            }
+
+            const Consensus::Params &consensusParams = Params().GetConsensus();
+            if (!ReadBlockFromDisk(block, (*mi).second, consensusParams))
+            {
+                // We don't have the block yet, although we know about it.
+                return error("Peer %d requested symbols for block %s that cannot be read",  pfrom->id, inv.hash.ToString());
+            }
+            else
+                SendRaptorSymbol(block, inv, connman);
+        }
+
+        return true;
+
+    }
+
+    else if (strCommand == NetMsgType::RAPTORCODESYMBOL && fRaptorEnabled)
+    {
+        // send block header along with every symnbol
+        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+        if (!pfrom->RaptorCapable())
+        {
+            Misbehaving(pfrom->GetId(), 100);
+            return error("%s message received from a non Raptor supporting node, peer=%d", strCommand, pfrom->id);
+        }
+
+        int nSizeRaptorSymbol = vRecv.size();
+
+        CInv inv(MSG_RAPTOR_CODES, uint256());
+        CBlock temp_block;
+
+        CRaptorSymbol _symbol;
+        vRecv >> _symbol;
+
+        {
+            LOCK(cs_main);
+            // Message consistency checking
+            // Check for symbol size and block header for validity
+            // TODO: nakul, raptor symbol size and header validation
+            // if (!IsRaptorSymbolValid(pfrom, _symbol.size()) )
+            // {
+            //     Misbehaving(pfrom->id, 100);
+            //     LogPrintf("Received an invalid %s from peer %d\n", strCommand, pfrom->id);
+            //
+            //     //TODO: Clear Symbol data
+            //     return false;
+            //
+            // }
+
+            // Is there a previous block or header to connect with
+            {
+                uint256 prevHash = (temp_block.GetBlockHeader()).hashPrevBlock;
+                BlockMap::iterator mi = mapBlockIndex.find(prevHash);
+                if (mi == mapBlockIndex.end()) {
+                    return error("Raptor symbol from peer %s will not connect, unknown previous block %s", pfrom->id,
+                                 prevHash.ToString());
+                }
+
+            }
+
+            CValidationState state;
+            const CBlockIndex *pindex = nullptr;
+            if (!ProcessNewBlockHeaders({temp_block.GetBlockHeader()}, state, Params(), &pindex))
+            {
+                int nDoS;
+                if (state.IsInvalid(nDoS)){
+                    if (nDoS > 0)
+                        Misbehaving(pfrom->id, nDoS);
+                    LogPrintf("Received an invalid %s header from peer %d\n", strCommand, pfrom->id);
+                }
+
+                //TODO: clear Symbol data
+                return false;
+            }
+
+            // pindex should always be set by AcceptBlockHeader
+            if (!pindex)
+            { 
+                LogPrintf("INTERNAL ERROR: pindex null"); 
+                // TODO: clear symbol data
+                return true;
+            }
+
+            inv.hash = pindex->GetBlockHash();
+            UpdateBlockAvailability(pfrom->id, inv.hash);
+
+            // return early if we already have the block data
+            if (pindex->nStatus & BLOCK_HAVE_DATA)
+            {
+                //TODO: Already received check
+                //TODO: clear symbol data
+		LogPrint("raptor","Received raptor symbol but returning because we already have block data %s from peer %d size %d bytes\n",inv.hash.ToString(), pfrom->id, nSizeRaptorSymbol);
+                return true;
+
+            }
+
+            // Request full block slowly if this one isn't extending the longest chain.
+            // Use the same raptor but not urgently, so it should be a part of vGetData request that needs to be sent
+            // to all nodes with GETRAPTORCODES with this block inv
+            // TODO: Continue from here Nakul
+
+
+
+            
+
+
+
+
+            bool result = ProcessRaptorSymbol(pfrom, nSizeRaptorSymbol, strCommand, connman, _symbol);
+            return result;
+
+
+
+
+        }
+
+
+        
+
+    }
+
+    //Raptor section end
+
     else if (strCommand == NetMsgType::GETADDR)
     {
         // This asymmetric behavior for inbound and outbound connections was introduced
@@ -3850,15 +4041,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         pfrom->fRelayTxes = true;
     }
 
-    else if (strCommand == NetMsgType::GETRAPTORCODES)
-    {
-
-    }
-
-    else if (strCommand == NetMsgType::RAPTORCODESYMBOL)
-    {
-
-    }
 
 
     else if (strCommand == NetMsgType::NOTFOUND) {

@@ -1,7 +1,9 @@
 #include "raptor_encoding.h"
+#include "net.h"
 #include "validation.h"
 #include "init.h"
 #include "validation.h"
+#include "utiltime.h"
 #include "alert.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -16,16 +18,18 @@
 
 namespace RaptorQ = RaptorQ__v1;
 
+CRaptorSymbolData raptordata;
+
 CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>(); }
 
 CRaptorSymbol::~CRaptorSymbol()
 {
 }
 
-CRaptorSymbol::CRaptorSymbol(const CBlockRef pblock)
+CRaptorSymbol::CRaptorSymbol(const CBlock pblock)
 {
-    header = pblock->GetBlockHeader();
-    vBlockTxs = pblock->vtx;
+    header = pblock.GetBlockHeader();
+    vBlockTxs = pblock.vtx;
 
     encode(pblock, vEncoded);
 }
@@ -42,11 +46,109 @@ inline void unpack (std::vector <uint8_t >& src, int index, T& data) {
     copy (&src[index], &src[index + sizeof (T)], &data);
 }
 
-bool encode (const CBlockRef pblock, std::vector<uint8_t>& vEncoded)
+template <class T>
+void CRaptorSymbolData::updateStats(std::map<int64_t, T>& statsMap, T value)
 {
+    AssertLockHeld(cs_raptorstats);
+    statsMap[getTimeForStats()] = value;
+    expireStats(statsMap);
+
+}
+
+
+
+template <class T>
+void CRaptorSymbolData::expireStats(std::map<int64_t, T>& statsMap)
+{
+    AssertLockHeld(cs_raptorstats);
+    // Delete entries that are more than 24 hours old
+    int64_t nTimeCutOff = getTimeForStats() - 60*60*24*1000;
+
+    typename std::map<int64_t, T>::iterator iter  = statsMap.begin();
+    while (iter != statsMap.end())
+    {
+        typename std::map<int64_t, T>::iterator mi = iter++;
+        // increment to avoid iterator becoming invalid when erasing below
+        if (mi->first < nTimeCutOff)
+            statsMap.erase(mi);
+
+    }
+
+}
+
+double CRaptorSymbolData::average(std::map<int64_t, uint64_t>& map)
+{
+    AssertLockHeld(cs_raptorstats);
+    expireStats(map);
+    if (map.size() == 0)
+        return 0.0;
+
+    uint64_t accum=0U;
+    for (std::pair<int64_t, uint64_t>p : map)
+    {
+        //avoid wraparounds
+        accum = std::max(accum, accum+p.second);
+
+    }
+    return ( double ) accum/map.size();
+
+}
+
+void CRaptorSymbolData::IncrementDecodeFailures()
+{
+    LOCK(cs_raptorstats);
+    nDecodeFailures +=1;
+
+}
+
+uint64_t CRaptorSymbolData::AddRaptorSymbolBytes(uint64_t bytes, CNode *pfrom)
+{
+    pfrom->nLocalRaptorSymbolBytes += bytes;
+    uint64_t ret= nRaptorSymbolBytes.fetch_add(bytes) + bytes;
+    return ret;
+
+}
+
+uint64_t CRaptorSymbolData::DeleteRaptorSymbolBytes(uint64_t bytes, CNode *pfrom)
+{
+    if (bytes <= pfrom->nLocalRaptorSymbolBytes)
+        pfrom->nLocalRaptorSymbolBytes -= bytes;
+
+    if (bytes <= nRaptorSymbolBytes)
+        nRaptorSymbolBytes.fetch_sub(bytes);
+
+}
+
+bool encode (const CBlock pblock, std::vector<uint8_t>& vEncoded)
+{
+    // std::vector<uint8_t> input; 
+    // pack(input, pblock);
+
+    // symbol size in bytes
+    // const uint16_t symbol_size = 16;
+
+    // now initialize the encoder.
+    // the input for the encoder is std::vector<uint8_t>
+    // the output for the encoder is std::vector<uint8_t>
+    // yes, you can have different types, but most of the time you will
+    // want to work with uint8_t
+    // RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator> enc (block, symbol_size);
+
+
+    // symbol size in bytes
+    // const uint16_t symbol_size = 16;
     return true;
 
 }
+
+bool decode (std::vector<uint8_t>& vEncoded)
+{
+
+    using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
+
+}
+
+
 
 bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probability, const uint8_t overhead)
 {
@@ -93,7 +195,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
     // give the input to the encoder. the encoder answers with the size of what
     // it can use
     if (enc.set_data (input.begin(), input.end()) != nSize) {
-        LogPrintf("Could not give data to the encoder :(\n");
+        LogPrint("raptor","Could not give data to the encoder :(\n");
         return false;
     }
 
@@ -102,7 +204,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
     uint16_t _symbols = enc.symbols();
     // print some stuff in output
     
-    LogPrintf( "Size: %d, symbols: %d, symbol size: %d \n", nSize, static_cast<uint32_t> (_symbols), static_cast<int32_t>(enc.symbol_size()) );
+    LogPrint("raptor", "Size: %d, symbols: %d, symbol size: %d \n", nSize, static_cast<uint32_t> (_symbols), static_cast<int32_t>(enc.symbol_size()) );
 
     // RQ need to do its magic on the input before you can ask the symbols.
     // multiple ways to do this are available.
@@ -113,7 +215,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
     if (!enc.compute_sync()) {
         // if this happens it's a bug in the library.
         // the **Decoder** can fail, but the **Encoder** can never fail.
-        LogPrintf("Enc-RaptorQ failure! really bad!\n");
+        LogPrint("raptor","Enc-RaptorQ failure! really bad!\n");
         return false;
     }
 

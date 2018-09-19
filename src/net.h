@@ -17,6 +17,7 @@
 #include "primitives/block.h"
 #include "protocol.h"
 #include "random.h"
+#include "raptor_encoding.h"
 #include "streams.h"
 #include "sync.h"
 #include "uint256.h"
@@ -803,6 +804,15 @@ public:
     uint64_t nGetGrapheneLastTime; // The last time a get_graphene request was made
     uint32_t nGrapheneBloomfilterSize; // The maximum graphene bloom filter size (in bytes) that our peer will accept.
     // DIPXXX Graphene blocks: end section
+    
+    // Raptor Symbol: begin section
+    CRaptorSymbol _symbol;
+    uint64_t nLocalRaptorSymbolBytes;
+    int nSizeRaptorSymbol;
+    double nGetRaptorLastTime;
+    double nGetRaptorSymbolCount;
+
+    // Raptor Symbol End Section
 
 
 protected:
