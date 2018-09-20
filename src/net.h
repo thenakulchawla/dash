@@ -716,6 +716,22 @@ public:
     };
     //// Graphene end section
 
+
+    // Raptor: In Flight begin Section
+    struct CRaptorSymbolInFlight
+    {
+        int64_t nRequestTime;
+        bool fReceived;
+
+        CRaptorSymbolInFlight()
+        {
+            nRequestTime = GetTime();
+            fReceived = false;
+        }
+
+    };
+    // Raptor: In Flight end Section
+
     // socket
     std::atomic<ServiceFlags> nServices;
     ServiceFlags nServicesExpected;
@@ -806,11 +822,14 @@ public:
     // DIPXXX Graphene blocks: end section
     
     // Raptor Symbol: begin section
-    CRaptorSymbol _symbol;
+    CRaptorSymbol raptorSymbol;
     uint64_t nLocalRaptorSymbolBytes;
     int nSizeRaptorSymbol;
     double nGetRaptorLastTime;
     double nGetRaptorSymbolCount;
+    CCriticalSection cs_mapraptorsymbolinflight; // lock mapGraheneBlocksInFlight
+    std::map<uint256, CRaptorSymbolInFlight> mapRaptorSymbolsInFlight; // graphene blocks in flight and the time requested.
+
 
     // Raptor Symbol End Section
 

@@ -2986,7 +2986,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 // Might have collided, fall back to getdata now :(
                 std::vector<CInv> invs;
                 invs.push_back(CInv(MSG_BLOCK, resp.blockhash));
-                LogPrintf("Nakul Sending MSG_BLOCK\n");
                 connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, invs));
             } else {
                 // Block is either okay, or possibly we received
@@ -3733,8 +3732,8 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         CInv inv(MSG_RAPTOR_CODES, uint256());
         CBlock temp_block;
 
-        CRaptorSymbol _symbol;
-        vRecv >> _symbol;
+        CRaptorSymbol raptorSymbol;
+        vRecv >> raptorSymbol;
 
         {
             LOCK(cs_main);
@@ -3803,23 +3802,36 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // to all nodes with GETRAPTORCODES with this block inv
             // TODO: Continue from here Nakul
 
+            if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
+            {
+                std::vector<CInv> vGetData;
+                connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETRAPTORCODES, vGetData));
 
+                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
 
-            
+                LogPrintf("%s %s from peer %d received but does not extend longest chain; requesting full block\n", strCommand, inv.hash.ToString(), pfrom->id);
+                return true;
+            }
 
+            {
+                LogPrint("raptor", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(), pfrom->id, nSizeRaptorSymbol);
 
+                // Do not process unrequested symbols
+                LOCK(pfrom->cs_mapraptorsymbolinflight);
+                if (!pfrom->mapRaptorSymbolsInFlight.count(inv.hash))
+                {
+                    Misbehaving(pfrom->id, 100);
+                    return error("%s %s from peer %d but was unrequested\n", strCommand, inv.hash.ToString(), pfrom->id);
 
+                }
+                
 
-            bool result = ProcessRaptorSymbol(pfrom, nSizeRaptorSymbol, strCommand, connman, _symbol);
+            }
+
+            bool result = ProcessRaptorSymbol(pfrom, nSizeRaptorSymbol, strCommand, connman, raptorSymbol);
             return result;
 
-
-
-
         }
-
-
-        
 
     }
 

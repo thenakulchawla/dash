@@ -21,13 +21,15 @@
 #include <thread>
 #include <tuple>
 #include <vector>
-#include "util.h"
-#include "utiltime.h"
+#include "consensus/validation.h"
+#include "primitives/block.h"
+#include "serialize.h"
 #include "stat.h"
 #include "sync.h"
 #include "uint256.h"
-#include "serialize.h"
-#include "primitives/block.h"
+#include "util.h"
+#include "utiltime.h"
+
 #include "RaptorQ/RaptorQ_v1_hdr.hpp"
 
 
@@ -60,6 +62,14 @@ public:
         READWRITE(vEncoded);
     }
 
+    void SetNull()
+    {
+        header.SetNull();
+        vBlockTxs.clear();
+        vEncoded.clear();
+
+    }
+
 };
 
 class CRaptorSymbolData
@@ -77,7 +87,7 @@ private:
     CStatHistory<uint64_t> nOutBoundSymbols;
     CStatHistory<uint64_t> nDecodeFailures;
     CStatHistory<uint64_t> nTotalRaptorSymbolBytes;
-    std::map<int64_t, int64_t> mapRaptorResponseTime;
+    std::map<int64_t, int64_t> mapRaptorSymbolResponseTime;
     std::map<int64_t, int> mapRaptorSymbolValidationTime;
 
     template <class T>
@@ -94,15 +104,22 @@ public:
 
     uint64_t AddRaptorSymbolBytes(uint64_t, CNode *pfrom);
     uint64_t DeleteRaptorSymbolBytes(uint64_t, CNode *pfrom);
+    void ClearRaptorSymbolData(CNode *pfrom);
+    void ClearRaptorSymbolData(CNode *pfrom, const uint256 &hash);
+    void ClearRaptorSymbolStats();
+    uint64_t GetRaptorSymbolBytes();
+
 
 };
 
+extern CRaptorSymbolData raptordata; // Singleton class
+
 bool encode(const CBlock pblock, std::vector<uint8_t>& vEncoded);
 bool decode(std::vector<uint8_t>& vEncoded);
+bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);
 
 template <typename T>
 inline void pack (std::vector< uint8_t>& dst, T& data);
-
 
 template <typename T>
 inline void unpack (std::vector <uint8_t >& src, int index, T& data);

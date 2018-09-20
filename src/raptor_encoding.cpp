@@ -1,20 +1,15 @@
-#include "raptor_encoding.h"
-#include "net.h"
-#include "validation.h"
-#include "init.h"
-#include "validation.h"
-#include "utiltime.h"
+#include <iostream>
 #include "alert.h"
 #include "chain.h"
 #include "chainparams.h"
-// #include "primitives/block.h"
-// #include "primitives/transaction.h"
-
-
-// #include <boost/spirit/include/classic_core.hpp>
-// #include <boost/spirit/include/classic_file_iterator.hpp>
+#include "init.h"
+#include "net.h"
 #include "util.h"
-#include <iostream>
+#include "utiltime.h"
+#include "validation.h"
+#include "stat.h"
+
+#include "raptor_encoding.h"
 
 namespace RaptorQ = RaptorQ__v1;
 
@@ -117,6 +112,64 @@ uint64_t CRaptorSymbolData::DeleteRaptorSymbolBytes(uint64_t bytes, CNode *pfrom
     if (bytes <= nRaptorSymbolBytes)
         nRaptorSymbolBytes.fetch_sub(bytes);
 
+}
+
+void CRaptorSymbolData::ClearRaptorSymbolData(CNode *pnode)
+{
+    // Remove bytes from counter
+    raptordata.DeleteRaptorSymbolBytes(pnode->nLocalRaptorSymbolBytes, pnode);
+    pnode->nLocalRaptorSymbolBytes = 0;
+
+    // Clear out graphene block data we no longer need
+    // pnode->grapheneBlockWaitingForTxns = -1;
+    pnode->raptorSymbol.SetNull();
+    // pnode->grapheneBlockHashes.clear();
+    // pnode->grapheneMapHashOrderIndex.clear();
+    // pnode->mapGrapheneMissingTx.clear();
+
+    LogPrint("raptor", "Total in-memory raptor bytes size after clearing a raptor block is %ld bytes\n",
+        raptordata.GetRaptorSymbolBytes());
+}
+
+void CRaptorSymbolData::ClearRaptorSymbolData(CNode *pnode, const uint256 &hash)
+{
+    // We must make sure to clear the graphene block data first before clearing the graphene block in flight.
+    ClearRaptorSymbolData(pnode);
+    // ClearRaptorSymbolInFlight(pnode, hash);
+}
+
+void CRaptorSymbolData::ClearRaptorSymbolStats()
+{
+    LOCK(cs_raptorstats);
+
+    nSymbolSize.Clear();
+    nInBoundSymbols.Clear();
+    nOutBoundSymbols.Clear();
+    nDecodeFailures.Clear();
+    nTotalRaptorSymbolBytes.Clear();
+
+    mapRaptorSymbolResponseTime.clear();
+    mapRaptorSymbolValidationTime.clear();
+}
+
+uint64_t CRaptorSymbolData::GetRaptorSymbolBytes() { return nRaptorSymbolBytes.load(); }
+
+bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header)
+{
+    CValidationState state;
+    if (!CheckBlockHeader (header, state, Params().GetConsensus(), true) )
+    {
+        return error("Received invalid header for raptor symbol %s from peer %d", header.GetHash().ToString(), pfrom->id);
+    }
+
+    if (state.Invalid())
+    {
+        return error("Received invalid header for raptor symbol %s from peer %d", header.GetHash().ToString(), pfrom->id);
+    }
+
+    // Check for the current symbol size too. Add it as a parameter.
+
+    return true;
 }
 
 bool encode (const CBlock pblock, std::vector<uint8_t>& vEncoded)
