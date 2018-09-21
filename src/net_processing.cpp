@@ -3181,20 +3181,31 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 }
 
                 if (vGetData.size() > 0) {
-                    if (nodestate->fSupportsDesiredCmpctVersion && vGetData.size() == 1 && mapBlocksInFlight.size() == 1 && pindexLast->pprev->IsValid(BLOCK_VALID_CHAIN)) {
+                    if (vGetData.size() == 1 && mapBlocksInFlight.size() == 1 && pindexLast->pprev->IsValid(BLOCK_VALID_CHAIN)) {
                         if (fGrapheneBlockEnabled && CanGrapheneBlockBeDownloaded(pfrom) && connman.HaveGrapheneNodes())
                         {
                             // In any case, we want to download using a graphene block, not a regular one
                             vGetData[0] = CInv(MSG_GRAPHENE_BLOCK, vGetData[0].hash);
 
                         }
-                        else
+                        else if ( nodestate->fSupportsDesiredCmpctVersion )
                         {
                             // In any case, we want to download using a compact block, not a regular one
                             vGetData[0] = CInv(MSG_CMPCT_BLOCK, vGetData[0].hash);
                         }
+                        else if (fRaptorEnabled && connman.HaveRaptorNodes())
+                        {
+                            vGetData[0] = CInv(MSG_RAPTOR_CODES, vGetData[0].hash);
+                            for (auto node : lNodesSendingRaptorCodes)
+                            {
+                                connman.PushMessage(node, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+
+                            }
+
+                        }
                     }
-                    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                    if ( !fRaptorEnabled )
+                        connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
                 }
             }
         }
@@ -3745,8 +3756,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         {
             LOCK(cs_main);
-            // Message consistency checking
-            // Check for symbol size and block header for validity
             // TODO: nakul, raptor symbol size and header validation
             // if (!IsRaptorSymbolValid(pfrom, _symbol.size()) )
             // {
@@ -3812,9 +3821,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
             if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
             {
-                // CInv inv;
-                // TODO: Nakul Connman Foreach
-                
                 connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
                 CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                 CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
@@ -3829,21 +3835,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
                 }
 
-                // for (auto node: lNodesSendingRaptorCodes)
-                // {
-                //     connman.PushMessage(node , msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
-                // }
-
-                // connman.ForNode(lNodesSendingRaptorCodes.front(), [&connman](CNode* pnodeStop){
-                //     connman.PushMessage(pnodeStop, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
-                //     // return true;
-                // });
-                // lNodesSendingRaptorCodes.pop_front();
-                // connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETRAPTORCODES, vGetData));
-
                 raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
 
-                LogPrintf("%s %s from peer %d received but does not extend longest chain; requesting full block\n", strCommand, inv.hash.ToString(), pfrom->id);
+                LogPrintf("%s %s from peer %d received but does not extend longest chain; requesting raptor codes through GETDATA block\n", strCommand, inv.hash.ToString(), pfrom->id);
                 return true;
             }
 
