@@ -22,6 +22,7 @@
 #include <tuple>
 #include <vector>
 #include "consensus/validation.h"
+#include "net.h"
 #include "primitives/block.h"
 #include "serialize.h"
 #include "stat.h"

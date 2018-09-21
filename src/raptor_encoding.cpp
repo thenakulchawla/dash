@@ -14,6 +14,7 @@
 namespace RaptorQ = RaptorQ__v1;
 
 CRaptorSymbolData raptordata;
+// std::set<NodeId> lNodesSendingRaptorCodes;
 
 CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>(); }
 
@@ -49,8 +50,6 @@ void CRaptorSymbolData::updateStats(std::map<int64_t, T>& statsMap, T value)
     expireStats(statsMap);
 
 }
-
-
 
 template <class T>
 void CRaptorSymbolData::expireStats(std::map<int64_t, T>& statsMap)
@@ -200,8 +199,6 @@ bool decode (std::vector<uint8_t>& vEncoded)
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
 
 }
-
-
 
 bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probability, const uint8_t overhead)
 {

@@ -369,6 +369,7 @@ public:
     /** CConnman Raptor Begin Section */
     
     bool HaveRaptorNodes();
+    void UpdateRaptorNodesSet(std::list<CNode*>& lNodesSendingRaptorCodes);
     
     /** CConnman Raptor End Section */
 

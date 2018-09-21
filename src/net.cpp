@@ -20,6 +20,7 @@
 #include "graphene.h"
 #include "hash.h"
 #include "primitives/transaction.h"
+#include "raptor_encoding.h"
 #include "netbase.h"
 #include "scheduler.h"
 #include "ui_interface.h"
@@ -625,6 +626,21 @@ bool CConnman::HaveRaptorNodes()
     }
 
     return false;
+}
+
+void CConnman::UpdateRaptorNodesSet(std::list<CNode*>& lNodesSendingRaptorCodes)
+{
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        std::list<CNode*>::iterator temp = std::find(lNodesSendingRaptorCodes.begin(), lNodesSendingRaptorCodes.end(),pnode);
+        if (pnode->RaptorCapable() && temp == lNodesSendingRaptorCodes.end() )
+        {
+            lNodesSendingRaptorCodes.push_back(pnode);
+        }
+
+    }
+
 }
 
 /**  Raptor End Section */

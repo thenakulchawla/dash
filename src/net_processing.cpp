@@ -159,8 +159,11 @@ namespace {
     /** Expiration-time ordered list of (expire time, relay map entry) pairs, protected by cs_main). */
     std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 
+    /** Raptor */
+    std::list<CNode*> lNodesSendingRaptorCodes;
 
-    /** Raptor  */
+
+
 } // anon namespace
 
 //////////////////////////////////////////////////////////////////////////////
@@ -463,6 +466,8 @@ void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman& connman) {
         });
     }
 }
+
+
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -1031,7 +1036,7 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman& connma
 
 inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman);
 // TODO: add pfrom, because reply is sent to one node not all
-inline void static SendRaptorSymbol(const CBlock pblock, const CInv &inv, CConnman& connman);
+inline void static SendRaptorSymbol(const CBlock& pblock, CNode *pfrom, const CInv &inv, CConnman& connman);
 
 void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParams, CConnman& connman, const std::atomic<bool>& interruptMsgProc)
 {
@@ -1155,7 +1160,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                     else if (inv.type == MSG_RAPTOR_CODES)
                     {
                         LogPrint("raptor", "Sending Raptor Symbols by INV queue getdata message\n");
-                        SendRaptorSymbol(block, inv, connman);
+                        SendRaptorSymbol(block, pfrom, inv, connman);
                     }
 
 
@@ -1349,12 +1354,6 @@ inline void static SendBlockTransactions(const CBlock& block, const BlockTransac
     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
-inline void static SendRaptorSymbol(const CBlock pblock, const CInv &inv, CConnman& connman)
-{
-    LogPrint("raptor","SendRaptorSymbol\n");
-
-    return;
-}
 
 inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
 {
@@ -1419,6 +1418,13 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
 
     // pfrom->blocksSent += 1;
 
+}
+
+inline void static SendRaptorSymbol(const CBlock& pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
+{
+    LogPrint("raptor","SendRaptorSymbol\n");
+
+    // return;
 }
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount, CConnman& connman)
@@ -3710,7 +3716,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 return error("Peer %d requested symbols for block %s that cannot be read",  pfrom->id, inv.hash.ToString());
             }
             else
-                SendRaptorSymbol(block, inv, connman);
+            {
+                SendRaptorSymbol(block, pfrom, inv, connman);
+            }
         }
 
         return true;
@@ -3804,8 +3812,34 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
             if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
             {
-                std::vector<CInv> vGetData;
-                connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETRAPTORCODES, vGetData));
+                // CInv inv;
+                // TODO: Nakul Connman Foreach
+                
+                connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
+                CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
+                ss << inv;
+            
+                for (auto node : lNodesSendingRaptorCodes)
+                {
+                    // connman.ForNode(nodeid, [&connman](CNode* pfrom) 
+                    // {
+                    connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
+                    // });
+
+                }
+
+                // for (auto node: lNodesSendingRaptorCodes)
+                // {
+                //     connman.PushMessage(node , msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
+                // }
+
+                // connman.ForNode(lNodesSendingRaptorCodes.front(), [&connman](CNode* pnodeStop){
+                //     connman.PushMessage(pnodeStop, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
+                //     // return true;
+                // });
+                // lNodesSendingRaptorCodes.pop_front();
+                // connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETRAPTORCODES, vGetData));
 
                 raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
 
