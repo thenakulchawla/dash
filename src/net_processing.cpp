@@ -3757,15 +3757,15 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         {
             LOCK(cs_main);
             // TODO: nakul, raptor symbol size and header validation
-            // if (!IsRaptorSymbolValid(pfrom, _symbol.size()) )
-            // {
-            //     Misbehaving(pfrom->id, 100);
-            //     LogPrintf("Received an invalid %s from peer %d\n", strCommand, pfrom->id);
-            //
-            //     //TODO: Clear Symbol data
-            //     return false;
-            //
-            // }
+            if (!IsRaptorSymbolValid(pfrom, raptorSymbol.header) )
+            {
+                Misbehaving(pfrom->id, 100);
+                LogPrintf("Received an invalid %s from peer %d\n", strCommand, pfrom->id);
+
+                //TODO: Clear Symbol data
+                return false;
+
+            }
 
             // Is there a previous block or header to connect with
             {

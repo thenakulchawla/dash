@@ -82,7 +82,6 @@ double CRaptorSymbolData::average(std::map<int64_t, uint64_t>& map)
     {
         //avoid wraparounds
         accum = std::max(accum, accum+p.second);
-
     }
     return ( double ) accum/map.size();
 
@@ -173,6 +172,7 @@ bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header)
 
 bool encode (const CBlock pblock, std::vector<uint8_t>& vEncoded)
 {
+    // std::vector<uint8_t> input;
     // std::vector<uint8_t> input; 
     // pack(input, pblock);
 
