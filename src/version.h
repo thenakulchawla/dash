@@ -47,7 +47,7 @@ static const int SHORT_IDS_BLOCKS_VERSION = 70309; // change it to 70209 later
 //! Graphene (bloom filter and IBLT) based download starts with this version
 static const int GRAPHENE_BLOCK_VERSION = 70401; // change it to 70301 later
 
-//! Sharding of blockchain starts with this version
+//! Data aggregation with raptor codes of blockchain starts with this version
 static const int RAPTOR_VERSION = 70302;
 
 #endif // BITCOIN_VERSION_H

@@ -22,6 +22,7 @@
 #include <tuple>
 #include <vector>
 #include "consensus/validation.h"
+#include "chain.h"
 #include "net.h"
 #include "primitives/block.h"
 #include "serialize.h"
@@ -115,7 +116,7 @@ public:
 
 extern CRaptorSymbolData raptordata; // Singleton class
 
-bool encode(const CBlock pblock, std::vector<uint8_t>& vEncoded);
+bool encode ( const CBlockIndex* pindex, std::vector<uint8_t>& vEncoded, const uint32_t nSize);
 bool decode(std::vector<uint8_t>& vEncoded);
 bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);
 
