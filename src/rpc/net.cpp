@@ -20,6 +20,7 @@
 #include "utilstrencodings.h"
 #include "version.h"
 #include "graphene.h"
+#include "raptor_encoding.h"
 
 #include <boost/foreach.hpp>
 
@@ -392,6 +393,25 @@ static UniValue GetGrapheneStats()
     return obj;
 }
 
+static UniValue GetRaptorStats()
+{
+    UniValue obj(UniValue::VOBJ);
+    bool enabled = IsRaptorEnabled();
+    obj.push_back(Pair("enabled", enabled));
+    if (enabled)
+    {
+        obj.push_back(Pair("summary", raptordata.ToString()));
+        // obj.push_back(Pair("inbound_percent", raptordata.InBoundPercentToString()));
+        // obj.push_back(Pair("outbound_percent", raptordata.OutBoundPercentToString()));
+        // obj.push_back(Pair("response_time", raptordata.ResponseTimeToString()));
+        // obj.push_back(Pair("validation_time", raptordata.ValidationTimeToString()));
+        //TODO: Nakul add more metrics
+
+    }
+    return obj;
+
+}
+
 static UniValue GetNetworksInfo()
 {
     UniValue networks(UniValue::VARR);
@@ -486,6 +506,7 @@ UniValue getnetworkinfo(const JSONRPCRequest& request)
     }
     obj.push_back(Pair("localaddresses", localAddresses));
     obj.push_back(Pair("grapheneblockstats", GetGrapheneStats()));
+    obj.push_back(Pair("raptorsymbolstats", GetRaptorStats()));
     obj.push_back(Pair("warnings",       GetWarnings("statusbar")));
     return obj;
 }
@@ -503,6 +524,22 @@ UniValue clearblockstats(const UniValue &params, bool fHelp)
         graphenedata.ClearGrapheneBlockStats();
 
     return NullUniValue;
+}
+
+UniValue clearsymbolstats(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 0)
+        throw std::runtime_error("clearsymbolstats\n"
+                            "\nClears statistics related to raptor symbol.\n"
+                            "\nArguments: None\n"
+                            "\nExample:\n" +
+                            HelpExampleCli("clearsymbolstats", ""));
+
+    if (IsRaptorEnabled())
+        raptordata.ClearRaptorSymbolStats();
+
+    return NullUniValue;
+
 }
 
 UniValue setban(const JSONRPCRequest& request)

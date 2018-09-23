@@ -157,7 +157,7 @@ std::string CRaptorSymbolData::ToString()
 {
     LOCK(cs_raptorstats);
     std::ostringstream ss;
-    ss << "Raptor Codes consumed " << formatInfoUnit(double(nSymbolSize())) << " bandwidth";
+    ss << "Raptor consumed " << formatInfoUnit(nSymbolSize) << " bandwidth";
     return ss.str();
 
 }

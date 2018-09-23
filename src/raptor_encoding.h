@@ -110,6 +110,7 @@ public:
     void ClearRaptorSymbolData(CNode *pfrom, const uint256 &hash);
     void ClearRaptorSymbolStats();
     uint64_t GetRaptorSymbolBytes();
+    std::string ToString();
 
 
 };
@@ -119,6 +120,7 @@ extern CRaptorSymbolData raptordata; // Singleton class
 bool encode ( const CBlockIndex* pindex, std::vector<uint8_t>& vEncoded, const uint32_t nSize);
 bool decode(std::vector<uint8_t>& vEncoded);
 bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);
+bool IsRaptorEnabled();
 
 template <typename T>
 inline void pack (std::vector< uint8_t>& dst, T& data);

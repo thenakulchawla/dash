@@ -90,7 +90,7 @@ std::chrono::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service;
 CCriticalSection cs_statMap;
 CStatMap statistics;
-bool fGrapheneBlockEnabled = true;
+bool fGrapheneBlockEnabled = false;
 /** Graphene end section */
 
 /** Raptor Section begin */
