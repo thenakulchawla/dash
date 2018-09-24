@@ -2172,7 +2172,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
        }
 
        if (pfrom->nVersion >= RAPTOR_VERSION){
-           LogPrintf("Raptor enabled net_processing: %d\n", fRaptorEnabled);
+           // LogPrintf("Raptor enabled net_processing: %d\n", fRaptorEnabled);
            fRaptorEnabled = true;
        }
 
@@ -3196,11 +3196,15 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         else if (fRaptorEnabled && connman.HaveRaptorNodes())
                         {
                             vGetData[0] = CInv(MSG_RAPTOR_CODES, vGetData[0].hash);
-                            for (auto node : lNodesSendingRaptorCodes)
-                            {
-                                connman.PushMessage(node, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                            // TODO: Write logic for all nodes
+                            connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
 
-                            }
+
+                            // for (auto node : lNodesSendingRaptorCodes)
+                            // {
+                            //     connman.PushMessage(node, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                            //
+                            // }
 
                         }
                     }
@@ -3825,15 +3829,14 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                 CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
                 ss << inv;
+                // TODO: Write logic for all nodes
+                connman.PushMessage(pfrom, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
             
-                for (auto node : lNodesSendingRaptorCodes)
-                {
-                    // connman.ForNode(nodeid, [&connman](CNode* pfrom) 
-                    // {
-                    connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
-                    // });
-
-                }
+                // for (auto node : lNodesSendingRaptorCodes)
+                // {
+                //     connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
+                //
+                // }
 
                 raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
 
@@ -4784,9 +4787,6 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                     CBloomFilter filterMemPool;
 
-                    // LogPrintf("SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
-                    // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
-                    // LogPrint("graphene","SendMessages: connman.HaveGrapheneNodes : %d , grapheneData.checkGrapheneBlockTimer(inv2.hash): %d  \n",connman.HaveGrapheneNodes(), graphenedata.CheckGrapheneBlockTimer(inv2.hash));
                     if (connman.HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(inv2.hash))
                     {
                         // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
@@ -4837,6 +4837,20 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                 }
                 else if ( fRaptorEnabled && connman.HaveRaptorNodes() )
                 {
+                    connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
+                    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                    CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
+                    ss << inv;
+                    // TODO: Write logic for all nodes
+                    connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
+            
+                    // for (auto node : lNodesSendingRaptorCodes)
+                    // {
+                    //     connman.PushMessage(node, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
+                    //
+                    // }
+
+                    // raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
                     LogPrintf("SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
 
                 }

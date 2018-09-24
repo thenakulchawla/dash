@@ -1506,7 +1506,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     fDiscover = GetBoolArg("-discover", true);
     fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
     fRelayTxes = !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
-    fGrapheneBlockEnabled = GetBoolArg("-use-grapheneblocks", true);
+    fGrapheneBlockEnabled = GetBoolArg("-use-grapheneblocks", false);
     // fShardErasureEnabled = GetBoolArg("-use-shard-erasure", true);
     fRaptorEnabled = GetBoolArg("-use-raptor", true);
 
