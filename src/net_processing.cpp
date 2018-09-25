@@ -4800,15 +4800,12 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
         // Message: getdata (blocks)
         //
 
-        // LogPrintf("SendMessages: getdata for Nakul, fGrapheneEnabled: %d, fSyncStarted: %d, nSyncStarted: %d IsInitial: %d, haveGrapheneNodes: %d\n", fGrapheneBlockEnabled, state.fSyncStarted, nSyncStarted, IsInitialBlockDownload(), connman.HaveGrapheneNodes());
-        // LogPrintf("pto->fClient: %d, fFetch: %d, IsInitialBlockDownload(): %d, state.nBlocksInFlight: %d, MAX_BLOCKS_IN_TRANSIT_PER_PEER: %d\n", pto->fClient, fFetch,IsInitialBlockDownload(), state.nBlocksInFlight, MAX_BLOCKS_IN_TRANSIT_PER_PEER);
         std::vector<CInv> vGetData;
         if (!pto->fClient && (fFetch || !IsInitialBlockDownload()) && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             std::vector<const CBlockIndex*> vToDownload;
             NodeId staller = -1;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller, consensusParams);
             BOOST_FOREACH(const CBlockIndex *pindex, vToDownload) {
-            // LogPrintf("SendMessages for Nakul block message getdata, getgraphene\n");
                 if (fGrapheneBlockEnabled && connman.HaveGrapheneNodes())
                 {
                     CInv inv2(MSG_GRAPHENE_BLOCK, pindex->GetBlockHash());
@@ -4817,15 +4814,11 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
 
                     if (connman.HaveGrapheneNodes() && graphenedata.CheckGrapheneBlockTimer(inv2.hash))
                     {
-                        // LogPrintf("SendMessages: pto->mapGrapheneBlocksInFlight size: %d, CanGrapheneBeDownloaded: %d\n", pto->mapGrapheneBlocksInFlight.size(),  CanGrapheneBlockBeDownloaded(pto));
-                        // Must download a graphene block from a graphene enabled peer.
-                        // We can only request one graphene block per peer at a time.
                         if (pto->mapGrapheneBlocksInFlight.size() < 1 && CanGrapheneBlockBeDownloaded(pto))
                         {
                             // Instead of building a bloom filter here as we would for an xthin, we actually
                             // just need to fill in CMempoolInfo
                             
-                            // LogPrintf("SendMessages: Requesting graphene block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                             inv2.type = MSG_GRAPHENE_BLOCK;
                             CMemPoolInfo receiverMemPoolInfo = GetGrapheneMempoolInfo();
                             ss << inv2;
@@ -4879,7 +4872,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                     // }
 
                     // raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
-                    LogPrintf("SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
+                    // LogPrintf("SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
 
                 }
                 else
