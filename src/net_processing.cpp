@@ -1423,6 +1423,34 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
 inline void static SendRaptorSymbol(const CBlock& pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
 {
     LogPrint("raptor","SendRaptorSymbol\n");
+    CNetMsgMaker msgMaker(pfrom->GetSendVersion());
+
+    // TODO: Nakul nSize, nSymbolSize
+
+    if (inv.type == MSG_RAPTOR_CODES)
+    {
+        try
+        {
+            CRaptorSymbol raptorSymbol(pblock.GetBlockHeader(), 2048 ,16);
+            connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::RAPTORCODESYMBOL, raptorSymbol));
+            LogPrint("raptor","Raptor Symbol Sent\n"); 
+
+        }
+        catch ( const std::runtime_error &e )
+        {
+            connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, pblock));
+            LogPrint("raptor", "Sent regular block instead - encountered error while creating raptor symbol\n");
+
+        }
+
+    }
+    else
+    {
+        Misbehaving(pfrom->GetId(), 100);
+        return;
+    }
+
+    // pfrom->symbolsSent +=1;
 
     // return;
 }
