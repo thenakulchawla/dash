@@ -48,12 +48,12 @@ sleep 1
 
 sleep 10
 ./dash-cli -regtest -debug -use-raptor=1 -port=8332 -rpcport=8333 generate 202
-sleep 10
-./dash-cli -regtest -debug -use-raptor=1 -port=8334 -rpcport=8335 generate 202
+# sleep 10
+# ./dash-cli -regtest -debug -use-raptor=1 -port=8334 -rpcport=8335 generate 202
 # sleep 10
 # ./dash-cli -regtest -debug -use-raptor=1 -port=8336 -rpcport=8337 generate 202
-# sleep 10
-# ./dash-cli -regtest -debug -use-raptor=1 -port=8330 -rpcport=8331 generate 202
+sleep 10
+./dash-cli -regtest -debug -use-raptor=1 -port=8330 -rpcport=8331 generate 202
 
 ./dash-cli -regtest -debug -use-raptor=1 -port=8330 -rpcport=8331 getbalance 
 ./dash-cli -regtest -debug -use-raptor=1 -port=8332 -rpcport=8333 getbalance

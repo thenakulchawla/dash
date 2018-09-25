@@ -14,7 +14,7 @@
 namespace RaptorQ = RaptorQ__v1;
 
 CRaptorSymbolData raptordata;
-// std::set<NodeId> lNodesSendingRaptorCodes;
+std::map<uint256,CRaptorSymbol> raptorSymbols;
 
 CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>(); }
 
@@ -22,13 +22,13 @@ CRaptorSymbol::~CRaptorSymbol()
 {
 }
 
-CRaptorSymbol::CRaptorSymbol(const CBlock pblock)
+CRaptorSymbol::CRaptorSymbol(const CBlockHeader header, uint32_t nSize, uint16_t nSymbolSize)
 {
-    header = pblock.GetBlockHeader();
-    vBlockTxs = pblock.vtx;
 
     // TODO: Nakul Write the default function later. 
-    // encode(pblock, vEncoded,);
+    vEncoded = encode(header, nSize, nSymbolSize);
+    nSize = nSize;
+    nSymbolSize = nSymbolSize;
 }
 
 template <typename T>
@@ -185,20 +185,25 @@ bool IsRaptorEnabled()
     return fRaptorEnabled;
 }
 
-bool encode (const CBlockIndex* pindex, std::vector<uint8_t>& vEncoded, const uint32_t nSize)
+std::vector<uint8_t> encode (const CBlockHeader header, uint32_t nSize, const uint16_t nSymbolSize)
 {
+
+    const CBlockIndex* pindex = nullptr;
+    BlockMap::iterator mi = mapBlockIndex.find(header.GetHash());
+    if (mi != mapBlockIndex.end())
+    {
+        pindex = ( *mi ).second;
+    }
+
     CBlock pblock;
     bool ret = ReadBlockFromDisk(pblock, pindex, Params().GetConsensus());
 
     std::vector<uint8_t> input;
     pack(input, pblock);
 
-    // symbol size in bytes
-    const uint16_t symbol_size = 16;
-
     // how many symbols do we need to encode all our input in a single block?
-    auto min_symbols = (input.size() * sizeof(uint8_t)) / symbol_size;
-    if ((input.size() * sizeof(uint8_t)) % symbol_size != 0)
+    auto min_symbols = (input.size() * sizeof(uint8_t)) / nSymbolSize;
+    if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
         ++min_symbols;
 
     // convert "symbols" to a typesafe equivalent, RaptorQ::Block_Size
@@ -217,14 +222,14 @@ bool encode (const CBlockIndex* pindex, std::vector<uint8_t>& vEncoded, const ui
 
     }
 
-    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator, typename std::vector<uint8_t>::iterator> enc (block, symbol_size);
+    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator, typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
 
     // give input to the encoder, the encoder answers with the size of what
     // it can use
     if (enc.set_data(input.begin(), input.end()) != nSize)
     {
         LogPrint("raptor", "Could not give data to the encoder\n");
-        return false;
+        // return false;
     }
 
     // actual symbols. you could just use static_cast<uint16_t> (blok)
@@ -245,11 +250,24 @@ bool encode (const CBlockIndex* pindex, std::vector<uint8_t>& vEncoded, const ui
         // if this happens it's a bug in the library.
         // the **Decoder** can fail, but the **Encoder** can never fail.
         LogPrint("raptor","Enc-RaptorQ failure! really bad!\n");
-        return false;
+        // return false;
     }
 
+    uint256 symbol_id = header.GetHash();
+    std::vector<uint8_t> source_sym_data;
+    auto source_sym_it = enc.begin_source();
+    auto it = source_sym_data.begin();
+    auto written = (*source_sym_it) (it, source_sym_data.end());
+    if (written != nSymbolSize) 
+    {
+        // this can only happen if "source_sym_data" did not have
+        // enough space for a symbol (here: never)
+        LogPrintf("written %d -vs- symbol_size %d Could not get the whole source symbol!\n",written,nSymbolSize);
+        // return false;
+    }
 
-    return true;
+    return source_sym_data;
+
 }
 
 bool decode (std::vector<uint8_t>& vEncoded)
@@ -258,7 +276,7 @@ bool decode (std::vector<uint8_t>& vEncoded)
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
     
     /**
-    Decoder_type dec (block, symbol_size, Decoder_type::Report::COMPLETE);
+    Decoder_type dec (block, nSymbolSize, Decoder_type::Report::COMPLETE);
     // "Decoder_type::Report::COMPLETE" means that the decoder will not
     // give us any output until we have decoded all the data.
     // there are modes to extract the data symbol by symbol in an ordered
@@ -373,11 +391,11 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
     pack (input, cBlock);
 
     // symbol size in bytes
-    const uint16_t symbol_size = 16;
+    const uint16_t nSymbolSize = 16;
 
     // how many symbols do we need to encode all our input in a single block?
-    auto min_symbols = (input.size() * sizeof(uint8_t)) / symbol_size;
-    if ((input.size() * sizeof(uint8_t)) % symbol_size != 0)
+    auto min_symbols = (input.size() * sizeof(uint8_t)) / nSymbolSize;
+    if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
         ++min_symbols;
 
     // convert "symbols" to a typesafe equivalent, RaptorQ::Block_Size
@@ -401,7 +419,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
     // the output for the encoder is std::vector<uint8_t>
     // yes, you can have different types, but most of the time you will
     // want to work with uint8_t
-    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator> enc (block, symbol_size);
+    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
 
     // give the input to the encoder. the encoder answers with the size of what
     // it can use
@@ -462,15 +480,15 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
             // we save the symbol here:
             // make sure the vector has enough space for the symbol:
             // fill it with zeros for the size of the symbol
-            std::vector<uint8_t> source_sym_data (symbol_size, 0);
+            std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
 
             // save the data of the symbol into our vector
             auto it = source_sym_data.begin();
             auto written = (*source_sym_it) (it, source_sym_data.end());
-            if (written != symbol_size) {
+            if (written != nSymbolSize) {
                 // this can only happen if "source_sym_data" did not have
                 // enough space for a symbol (here: never)
-                LogPrintf("written %d -vs- symbol_size %d Could not get the whole source symbol!\n",written,symbol_size);
+                LogPrintf("written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n",written,nSymbolSize);
                 return false;
             }
 
@@ -504,13 +522,13 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
             // we save the symbol here:
             // make sure the vector has enough space for the symbol:
             // fill it with zeros for the size of the symbol
-            std::vector<uint8_t> repair_sym_data (symbol_size, 0);
+            std::vector<uint8_t> repair_sym_data (nSymbolSize, 0);
 
             // save the data of the symbol into our vector
             auto it = repair_sym_data.begin();
             auto written = (*repair_sym_it) (it, repair_sym_data.end());
-            if (written != symbol_size) {
-                LogPrintf("written %d -vs- symbol_size %d Could not get the whole source symbol!\n", written, symbol_size);
+            if (written != nSymbolSize) {
+                LogPrintf("written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n", written, nSymbolSize);
                 // this can only happen if "repair_sym_data" did not have
                 // enough space for a symbol (here: never)
                 return false;
@@ -547,7 +565,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
 
     // define "Decoder_type" to write less afterwards
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
-    Decoder_type dec (block, symbol_size, Decoder_type::Report::COMPLETE);
+    Decoder_type dec (block, nSymbolSize, Decoder_type::Report::COMPLETE);
     // "Decoder_type::Report::COMPLETE" means that the decoder will not
     // give us any output until we have decoded all the data.
     // there are modes to extract the data symbol by symbol in an ordered
