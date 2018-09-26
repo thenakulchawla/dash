@@ -1036,7 +1036,7 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman& connma
 
 inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman);
 // TODO: add pfrom, because reply is sent to one node not all
-inline void static SendRaptorSymbol(const CBlock& pblock, CNode *pfrom, const CInv &inv, CConnman& connman);
+inline void static SendRaptorSymbol(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman);
 
 void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParams, CConnman& connman, const std::atomic<bool>& interruptMsgProc)
 {
@@ -1160,7 +1160,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
                     else if (inv.type == MSG_RAPTOR_CODES)
                     {
                         LogPrint("raptor", "Sending Raptor Symbols by INV queue getdata message\n");
-                        SendRaptorSymbol(block, pfrom, inv, connman);
+                        SendRaptorSymbol(MakeBlockRef(block), pfrom, inv, connman);
                     }
 
 
@@ -1420,7 +1420,7 @@ inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const
 
 }
 
-inline void static SendRaptorSymbol(const CBlock& pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
+inline void static SendRaptorSymbol(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
 {
     LogPrint("raptor","SendRaptorSymbol\n");
     CNetMsgMaker msgMaker(pfrom->GetSendVersion());
@@ -1431,14 +1431,17 @@ inline void static SendRaptorSymbol(const CBlock& pblock, CNode *pfrom, const CI
     {
         try
         {
-            CRaptorSymbol raptorSymbol(pblock.GetBlockHeader(), 2048 ,16);
+            uint32_t nSize  = 2048;
+            uint16_t nSymbolSize = 16;
+            CRaptorSymbol raptorSymbol(MakeBlockRef(*pblock), nSize, nSymbolSize);
+            LogPrint("raptor","Setting raptorcode to send nSize:%d, nSymbolSize:%d\n", nSize, nSymbolSize);
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::RAPTORCODESYMBOL, raptorSymbol));
             LogPrint("raptor","Raptor Symbol Sent\n"); 
 
         }
         catch ( const std::runtime_error &e )
         {
-            connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, pblock));
+            connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCK, *pblock));
             LogPrint("raptor", "Sent regular block instead - encountered error while creating raptor symbol\n");
 
         }
@@ -3193,6 +3196,12 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         LogPrint("net", "Requesting Graphene block %s from  peer=%d\n",
                                 pindex->GetBlockHash().ToString(), pfrom->id);
                     }
+                    if (fRaptorEnabled && connman.HaveRaptorNodes())
+                    {
+                        LogPrint("raptor", "Requesting raptor codes for block %s from peer=%d\n", pindex->GetBlockHash().ToString(), pfrom->id);
+                        vGetData.push_back(CInv(MSG_RAPTOR_CODES, pindex->GetBlockHash()));
+
+                    }
                     else
                     {
                         vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
@@ -3223,6 +3232,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                         }
                         else if (fRaptorEnabled && connman.HaveRaptorNodes())
                         {
+                            LogPrint("raptor", "Requesting raptor codes for block, since getdata size = 1\n");
                             vGetData[0] = CInv(MSG_RAPTOR_CODES, vGetData[0].hash);
                             // TODO: Write logic for all nodes
                             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
@@ -3760,7 +3770,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             }
             else
             {
-                SendRaptorSymbol(block, pfrom, inv, connman);
+                SendRaptorSymbol(MakeBlockRef(block), pfrom, inv, connman);
             }
         }
 
@@ -3784,11 +3794,14 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         CBlock temp_block;
 
         CRaptorSymbol raptorSymbol;
+        // LogPrint("raptor","vRecv %s\n", vRecv);
         vRecv >> raptorSymbol;
 
         {
             LOCK(cs_main);
             // TODO: nakul, raptor symbol size and header validation
+            // LogPrint("raptor", "Header for raptor symbol is %s\n", raptorSymbol.header.GetHash());
+            LogPrint("raptor", "Raptor symbol nSize %u, nSymbolSize %u\n", raptorSymbol.nSize, raptorSymbol.nSymbolSize);
             if (!IsRaptorSymbolValid(pfrom, raptorSymbol.header) )
             {
                 Misbehaving(pfrom->id, 100);
@@ -3801,7 +3814,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
             // Is there a previous block or header to connect with
             {
-                uint256 prevHash = (temp_block.GetBlockHeader()).hashPrevBlock;
+                uint256 prevHash = (raptorSymbol.header.hashPrevBlock);
                 BlockMap::iterator mi = mapBlockIndex.find(prevHash);
                 if (mi == mapBlockIndex.end()) {
                     return error("Raptor symbol from peer %s will not connect, unknown previous block %s", pfrom->id,
@@ -3812,7 +3825,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
             CValidationState state;
             const CBlockIndex *pindex = nullptr;
-            if (!ProcessNewBlockHeaders({temp_block.GetBlockHeader()}, state, Params(), &pindex))
+            if (!ProcessNewBlockHeaders({raptorSymbol.header}, state, Params(), &pindex))
             {
                 int nDoS;
                 if (state.IsInvalid(nDoS)){
@@ -3851,26 +3864,27 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // to all nodes with GETRAPTORCODES with this block inv
             // TODO: Continue from here Nakul
 
-            if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
-            {
-                connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
-                CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-                CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
-                ss << inv;
-                // TODO: Write logic for all nodes
-                connman.PushMessage(pfrom, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
-            
-                // for (auto node : lNodesSendingRaptorCodes)
-                // {
-                //     connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
-                //
-                // }
-
-                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
-
-                LogPrintf("%s %s from peer %d received but does not extend longest chain; requesting raptor codes through GETDATA block\n", strCommand, inv.hash.ToString(), pfrom->id);
-                return true;
-            }
+            //TODO: Nakul do this later, focus on current block
+            // if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
+            // {
+            //     connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
+            //     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            //     CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
+            //     ss << inv;
+            //     // TODO: Write logic for all nodes
+            //     connman.PushMessage(pfrom, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
+            //
+            //     // for (auto node : lNodesSendingRaptorCodes)
+            //     // {
+            //     //     connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
+            //     //
+            //     // }
+            //
+            //     raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
+            //
+            //     LogPrintf("%s %s from peer %d received but does not extend longest chain; requesting raptor codes through GETDATA block\n", strCommand, inv.hash.ToString(), pfrom->id);
+            //     return true;
+            // }
 
             {
                 LogPrint("raptor", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(), pfrom->id, nSizeRaptorSymbol);
@@ -4862,7 +4876,8 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                     CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
                     ss << inv;
-                    // TODO: Write logic for all nodes
+                    // TODO: Nakul, Write logic for all nodes
+                    // TODO: Nakul, check only the above getdata
                     connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
             
                     // for (auto node : lNodesSendingRaptorCodes)

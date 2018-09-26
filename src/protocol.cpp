@@ -45,7 +45,7 @@ const char *GETGRAPHENETX = "getgrblktx";
 const char *GETGRAPHENE = "getgrblk";
 // Raptor 
 const char *GETRAPTORCODES = "getraptor";
-const char *RAPTORCODESYMBOL = "raptorcodesymbol";
+const char *RAPTORCODESYMBOL = "raptorcode";
 // Dash message types
 const char *TXLOCKREQUEST="ix";
 const char *TXLOCKVOTE="txlvote";

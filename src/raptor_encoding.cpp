@@ -4,9 +4,11 @@
 #include "chainparams.h"
 #include "init.h"
 #include "net.h"
+#include "primitives/block.h"
 #include "util.h"
 #include "utiltime.h"
 #include "validation.h"
+// #include "serialize.h"
 #include "stat.h"
 
 #include "raptor_encoding.h"
@@ -16,19 +18,27 @@ namespace RaptorQ = RaptorQ__v1;
 CRaptorSymbolData raptordata;
 std::map<uint256,CRaptorSymbol> raptorSymbols;
 
-CRaptorSymbol::CRaptorSymbol() { this->vEncoded=std::vector<uint8_t>(); }
+CRaptorSymbol::CRaptorSymbol() 
+{ 
+    // this->vEncoded=std::vector<uint8_t>(); 
+    CBlockHeader header;
+    nSize = 0;
+    nSymbolSize=0;
+}
 
 CRaptorSymbol::~CRaptorSymbol()
 {
 }
 
-CRaptorSymbol::CRaptorSymbol(const CBlockHeader header, uint32_t nSize, uint16_t nSymbolSize)
+CRaptorSymbol::CRaptorSymbol(const CBlockRef pblock, uint32_t nSize, uint16_t nSymbolSize)
 {
 
     // TODO: Nakul Write the default function later. 
-    vEncoded = encode(header, nSize, nSymbolSize);
+    header = pblock->GetBlockHeader();
+    // vEncoded = encode(header, nSize, nSymbolSize);
     nSize = nSize;
     nSymbolSize = nSymbolSize;
+    // encode(pblock, nSize, nSymbolSize);
 }
 
 template <typename T>
@@ -185,26 +195,34 @@ bool IsRaptorEnabled()
     return fRaptorEnabled;
 }
 
-std::vector<uint8_t> encode (const CBlockHeader header, uint32_t nSize, const uint16_t nSymbolSize)
+bool encode (const CBlockRef pblock, uint32_t nSize, const uint16_t nSymbolSize)
 {
 
-    const CBlockIndex* pindex = nullptr;
-    BlockMap::iterator mi = mapBlockIndex.find(header.GetHash());
-    if (mi != mapBlockIndex.end())
-    {
-        pindex = ( *mi ).second;
-    }
+    // const CBlockIndex* pindex = nullptr;
+    // BlockMap::iterator mi = mapBlockIndex.find(pblock_param.GetBlockHeader().GetHash());
+    // if (mi != mapBlockIndex.end())
+    // {
+    //     pindex = ( *mi ).second;
+    // }
+    //
+    // CBlock pblock;
+    // bool ret = ReadBlockFromDisk(pblock, pindex, Params().GetConsensus());
 
-    CBlock pblock;
-    bool ret = ReadBlockFromDisk(pblock, pindex, Params().GetConsensus());
-
-    std::vector<uint8_t> input;
-    pack(input, pblock);
+    // std::vector<uint8_t> input;
+    // pack(input, pblock);
 
     // how many symbols do we need to encode all our input in a single block?
-    auto min_symbols = (input.size() * sizeof(uint8_t)) / nSymbolSize;
-    if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
+    // auto min_symbols = (input.size() * sizeof(uint256)) / nSymbolSize;
+    int nSizeBlock = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION); 
+    LogPrint("raptor","Size of block to be encoded %d\n", nSizeBlock);
+    
+    auto min_symbols = nSizeBlock / nSymbolSize;
+    if ((nSizeBlock * sizeof(uint256)) % nSymbolSize != 0)
         ++min_symbols;
+
+    LogPrint("raptor", "min_symbols %d\n", min_symbols);
+
+    /**
 
     // convert "symbols" to a typesafe equivalent, RaptorQ::Block_Size
     // This is needed because not all numbers are valid block sizes, and this
@@ -222,13 +240,14 @@ std::vector<uint8_t> encode (const CBlockHeader header, uint32_t nSize, const ui
 
     }
 
-    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator, typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
+    RaptorQ::Encoder<typename std::vector<uint256>::iterator, typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
 
     // give input to the encoder, the encoder answers with the size of what
     // it can use
     if (enc.set_data(input.begin(), input.end()) != nSize)
     {
         LogPrint("raptor", "Could not give data to the encoder\n");
+        // nSize = nSize * 2;
         // return false;
     }
 
@@ -265,8 +284,9 @@ std::vector<uint8_t> encode (const CBlockHeader header, uint32_t nSize, const ui
         LogPrintf("written %d -vs- symbol_size %d Could not get the whole source symbol!\n",written,nSymbolSize);
         // return false;
     }
+    **/
 
-    return source_sym_data;
+    return true;
 
 }
 

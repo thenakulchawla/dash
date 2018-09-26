@@ -44,17 +44,15 @@ class CConnman;
 
 class CRaptorSymbol
 {
-private:
-    std::vector<uint8_t> vEncoded;
+public:
+    // std::vector<uint8_t> vEncoded;
+    CBlockHeader header;
     uint32_t nSize;
     uint16_t nSymbolSize;
 
 public:
-    CBlockHeader header;
-
-public:
     CRaptorSymbol();
-    CRaptorSymbol(const CBlockHeader header, uint32_t nSize, uint16_t nSymbolSize);
+    CRaptorSymbol(const CBlockRef pblock, uint32_t nSize, uint16_t nSymbolSize);
     ~CRaptorSymbol();
 
     ADD_SERIALIZE_METHODS;
@@ -65,14 +63,15 @@ public:
         READWRITE(header);
         READWRITE(nSize);
         READWRITE(nSymbolSize);
-        READWRITE(vEncoded);
+        // READWRITE(vEncoded);
     }
 
     void SetNull()
     {
         header.SetNull();
         nSize = 0;
-        vEncoded.clear();
+        nSymbolSize =0;
+        // vEncoded.clear();
 
     }
 
@@ -123,7 +122,7 @@ public:
 
 extern CRaptorSymbolData raptordata; // Singleton class
 
-std::vector<uint8_t> encode ( const CBlockHeader header, uint32_t nSize, const uint16_t nSymbolSize);
+bool encode ( const CBlockRef pblock, uint32_t nSize, const uint16_t nSymbolSize);
 
 bool decode(std::vector<uint8_t>& vEncoded);
 bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);
