@@ -16,13 +16,11 @@
 namespace RaptorQ = RaptorQ__v1;
 
 CRaptorSymbolData raptordata;
+
 std::map< uint256, std::vector<uint8_t> > raptorSymbolsForReconstruction;
 
 CRaptorSymbol::CRaptorSymbol() 
 { 
-    // this->vEncoded=std::vector<uint8_t>(); 
-    // CBlockHeader header;
-    // nSymbolSize=0;
 }
 
 CRaptorSymbol::~CRaptorSymbol()

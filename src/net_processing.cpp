@@ -1913,9 +1913,16 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
     return true;
 }
 
-bool ProcessRaptorSymbol(CNode* pfrom, int nSizeRaptorSymbol, std::string strCommand, CConnman& connman, CRaptorSymbol& _symbol)
+bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
 {
     LogPrint("raptor", "Processing raptor symbol\n");
+    // std::vector<uint8_t> recieved = _symbol.vEncoded;
+
+    // First check if symbols are enough
+    (raptorSymbolsForReconstruction[_symbol.header.GetHash()]).insert(raptorSymbolsForReconstruction[_symbol.header.GetHash()].end(),_symbol.vEncoded.begin(),_symbol.vEncoded.end());
+
+
+
 
     return true;
 
@@ -3895,10 +3902,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                 }
             }
 
-
-
-
-            bool result = ProcessRaptorSymbol(pfrom, nSizeRaptorSymbol, strCommand, connman, raptorSymbol);
+            bool result = ProcessRaptorSymbol(raptorSymbol);
             return result;
 
         }
