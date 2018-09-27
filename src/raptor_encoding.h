@@ -41,13 +41,16 @@ class CDataStream;
 class CNode;
 class CConnman;
 
+namespace RaptorQ = RaptorQ__v1;
 
 class CRaptorSymbol
 {
 public:
     CBlockHeader header;
     uint16_t nSymbolSize;
+    uint32_t nSize;
     std::vector<uint8_t> vEncoded;
+    uint16_t nBlockSize;
 
 public:
     CRaptorSymbol();
@@ -61,14 +64,19 @@ public:
     {
         READWRITE(header);
         READWRITE(nSymbolSize);
+        READWRITE(nSize);
         READWRITE(vEncoded);
+        READWRITE(nBlockSize);
     }
 
     void SetNull()
     {
         header.SetNull();
         nSymbolSize =0;
-        // vEncoded.clear();
+        nSize =0;
+        nBlockSize=0;
+        vEncoded.clear();
+
 
     }
 
@@ -122,7 +130,7 @@ extern CRaptorSymbolData raptordata; // Singleton class
 
 std::vector<uint8_t> encode ( const CBlockRef pblock, const uint16_t nSymbolSize);
 
-bool decode(std::vector<uint8_t>& vEncoded);
+bool decode(std::vector<uint8_t>& vEncoded, uint16_t nBlockSize, uint16_t nSymbolSize, uint32_t nSize);
 bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);
 bool IsRaptorEnabled();
 
@@ -131,6 +139,11 @@ inline void pack (std::vector< uint8_t>& dst, T& data);
 
 template <typename T>
 inline void unpack (std::vector <uint8_t >& src, int index, T& data);
+
+uint32_t CalculateTotalSymbolSize(RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>& enc, std::vector<uint8_t>& input);
+uint16_t CalculateMinSymbols(uint16_t nSymbolSize, std::vector<uint8_t>& input);
+
+uint16_t CalculateBlockSizeForRaptorSymbol(uint16_t min_symbols);
 
 bool test_raptor (const uint32_t mysize, std::mt19937_64 &rnd, float drop_prob, const uint8_t overhead);
 

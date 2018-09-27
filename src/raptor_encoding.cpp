@@ -33,6 +33,16 @@ CRaptorSymbol::CRaptorSymbol(const CBlockRef pblock, uint16_t nSymbolSize)
     header = pblock->GetBlockHeader();
     vEncoded = encode(pblock, nSymbolSize);
     nSymbolSize = nSymbolSize;
+    
+    std::vector<uint8_t> input;
+    pack(input,*pblock);
+    uint16_t min_symbols = CalculateMinSymbols(nSymbolSize, input); 
+    uint16_t nBlockSize = CalculateBlockSizeForRaptorSymbol( min_symbols);
+    RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( nBlockSize );
+    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
+
+    nSize = CalculateTotalSymbolSize(enc, input);
+    
 }
 
 template <typename T>
@@ -211,7 +221,7 @@ std::vector<uint8_t> encode (const CBlockRef pblock, uint16_t nSymbolSize)
     // how many symbols do we need to encode all our input in a single block?
     // auto min_symbols = (input.size() * sizeof(uint256)) / nSymbolSize;
     
-    auto min_symbols = nSizeBlock / nSymbolSize;
+    auto min_symbols = (input.size()*sizeof(uint8_t)) / nSymbolSize;
     if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
         ++min_symbols;
 
@@ -239,6 +249,7 @@ std::vector<uint8_t> encode (const CBlockRef pblock, uint16_t nSymbolSize)
     // give input to the encoder, the encoder answers with the size of what
     // it can use
     uint32_t nSize = enc.set_data(input.begin(), input.end());
+    
     // if (enc.set_data(input.begin(), input.end()) != nSize)
     // {
     //     LogPrint("raptor", "Could not give data to the encoder\n");
@@ -287,12 +298,12 @@ std::vector<uint8_t> encode (const CBlockRef pblock, uint16_t nSymbolSize)
     return source_sym_data;
 }
 
-bool decode (std::vector<uint8_t>& vEncoded)
+bool decode (std::vector<uint8_t>& vEncoded, uint16_t blockSize, uint16_t nSymbolSize, uint32_t nSize)
 {
     // define "Decoder_type" to write less afterwards
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
+    RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
     
-    /**
     Decoder_type dec (block, nSymbolSize, Decoder_type::Report::COMPLETE);
     // "Decoder_type::Report::COMPLETE" means that the decoder will not
     // give us any output until we have decoded all the data.
@@ -305,29 +316,29 @@ bool decode (std::vector<uint8_t>& vEncoded)
     std::vector<uint8_t> output (nSize, 0);
 
     // now push every received symbol into the decoder
-    for (auto &rec_sym : received)
-    {
+    // for (auto &rec_sym : vEncoded)
+    // {
         // as a reminder:
         //  rec_sym.first = symbol_id (uint32_t)
         //  rec_sym.second = std::vector<uint8_t> symbol_data
-        symbol_id tmp_id = rec_sym.first;
-        auto it = rec_sym.second.begin();
-        auto err = dec.add_symbol (it, rec_sym.second.end(), tmp_id);
+        // symbol_id tmp_id = rec_sym.first;
+        // auto it = rec_sym.begin();
+        // auto err = dec.add_symbol (it, rec_sym.second.end(), tmp_id);
 
-        if (err != RaptorQ::Error::NONE && err != RaptorQ::Error::NOT_NEEDED)
-        {
-            // When you add a symbol, you can get:
-            //   NONE: no error
-            //   NOT_NEEDED: libRaptorQ ignored it because everything is
-            //              already decoded
-            //   INITIALIZATION: wrong parameters to the decoder contructor
-            //   WRONG_INPUT: not enough data on the symbol?
-            //   some_other_error: errors in the library
-            LogPrintf("error adding?\n");
-            return false;
-
-        }
-    }
+        // if (err != RaptorQ::Error::NONE && err != RaptorQ::Error::NOT_NEEDED)
+        // {
+        //     // When you add a symbol, you can get:
+        //     //   NONE: no error
+        //     //   NOT_NEEDED: libRaptorQ ignored it because everything is
+        //     //              already decoded
+        //     //   INITIALIZATION: wrong parameters to the decoder contructor
+        //     //   WRONG_INPUT: not enough data on the symbol?
+        //     //   some_other_error: errors in the library
+        //     LogPrintf("error adding?\n");
+        //     return false;
+        //
+        // }
+    // }
 
     // by now we now there will be no more input, so we tell this to the
     // decoder. You can skip this call, but if the decoder does not have
@@ -349,7 +360,7 @@ bool decode (std::vector<uint8_t>& vEncoded)
     size_t decode_from_byte = 0;
     size_t skip_bytes_at_beginning_of_output =0;
     auto out_it = output.begin();
-    auto decoded = dec.decode_bytes (out_it, output.end(), decode_from_byte, skip_bytes_at_the_beginning_of_output);
+    auto decoded = dec.decode_bytes (out_it, output.end(), decode_from_byte, skip_bytes_at_beginning_of_output);
     // "decode_from_byte" can be used to have only a part of the output.
     // it can be used in advanced setups where you ask only a part
     // of the block at a time.
@@ -380,14 +391,13 @@ bool decode (std::vector<uint8_t>& vEncoded)
 
     // byte-wise check: did we actually decode everything the right way?
     // for testing
-    for (uint64_t i = 0; i < nSize; ++i) {
-        if (input[i] != output[i]) {
-            // this is a bug in the library, please report
-            LogPrintf("The output does not correspond to the input!\n");
-            return false;
-        }
-    }
-    **/
+    // for (uint64_t i = 0; i < nSize; ++i) {
+    //     if (input[i] != output[i]) {
+    //         // this is a bug in the library, please report
+    //         LogPrintf("The output does not correspond to the input!\n");
+    //         return false;
+    //     }
+    // }
 
     //Write logic to form the block and flush it to disk
 
@@ -395,6 +405,41 @@ bool decode (std::vector<uint8_t>& vEncoded)
     return true;
 
 }
+
+
+uint32_t CalculateTotalSymbolSize(RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>& enc, std::vector<uint8_t>& input)
+{
+    return enc.set_data (input.begin(), input.end());
+
+}
+
+
+uint16_t CalculateMinSymbols(uint16_t nSymbolSize, std::vector<uint8_t>& input)
+{
+    auto min_symbols = (input.size()*sizeof(uint8_t)) / nSymbolSize;
+    if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
+        ++min_symbols;
+
+    return min_symbols;
+}
+
+uint16_t CalculateBlockSizeForRaptorSymbol(uint16_t min_symbols)
+{
+    RaptorQ::Block_Size block = RaptorQ::Block_Size::Block_10;
+    for (auto blk : *RaptorQ::blocks)
+    {
+        // RaptorQ::blocks is a pointer to an array, just scan it to find your
+        // block.
+        if (static_cast<uint16_t> (blk) >= min_symbols) {
+            block = blk;
+            break;
+        }
+
+    }
+
+    return static_cast<uint16_t> (block);
+}
+
 
 bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probability, const uint8_t overhead)
 {
