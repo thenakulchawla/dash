@@ -45,14 +45,13 @@ class CConnman;
 class CRaptorSymbol
 {
 public:
-    // std::vector<uint8_t> vEncoded;
     CBlockHeader header;
-    uint32_t nSize;
     uint16_t nSymbolSize;
+    std::vector<uint8_t> vEncoded;
 
 public:
     CRaptorSymbol();
-    CRaptorSymbol(const CBlockRef pblock, uint32_t nSize, uint16_t nSymbolSize);
+    CRaptorSymbol(const CBlockRef pblock, uint16_t nSymbolSize);
     ~CRaptorSymbol();
 
     ADD_SERIALIZE_METHODS;
@@ -61,15 +60,13 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(header);
-        READWRITE(nSize);
         READWRITE(nSymbolSize);
-        // READWRITE(vEncoded);
+        READWRITE(vEncoded);
     }
 
     void SetNull()
     {
         header.SetNull();
-        nSize = 0;
         nSymbolSize =0;
         // vEncoded.clear();
 
@@ -77,7 +74,8 @@ public:
 
 };
 
-extern std::map<uint256, CRaptorSymbol> raptorSymbols;
+// extern std::map< uint256, > raptorSymbolsForReconstruction;
+extern std::map< uint256, std::vector<uint8_t> > raptorSymbolsForReconstruction;
 
 class CRaptorSymbolData
 {
@@ -122,7 +120,7 @@ public:
 
 extern CRaptorSymbolData raptordata; // Singleton class
 
-bool encode ( const CBlockRef pblock, uint32_t nSize, const uint16_t nSymbolSize);
+std::vector<uint8_t> encode ( const CBlockRef pblock, const uint16_t nSymbolSize);
 
 bool decode(std::vector<uint8_t>& vEncoded);
 bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);

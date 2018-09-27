@@ -1431,12 +1431,10 @@ inline void static SendRaptorSymbol(const CBlockRef pblock, CNode *pfrom, const 
     {
         try
         {
-            uint32_t nSize  = 2048;
             uint16_t nSymbolSize = 16;
-            CRaptorSymbol raptorSymbol(MakeBlockRef(*pblock), nSize, nSymbolSize);
-            LogPrint("raptor","Setting raptorcode to send nSize:%d, nSymbolSize:%d\n", nSize, nSymbolSize);
+            CRaptorSymbol raptorSymbol(MakeBlockRef(*pblock), nSymbolSize);
+            LogPrint("raptor","Setting raptorcode to send nSymbolSize:%d\n", nSymbolSize);
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::RAPTORCODESYMBOL, raptorSymbol));
-            LogPrint("raptor","Raptor Symbol Sent\n"); 
 
         }
         catch ( const std::runtime_error &e )
@@ -1452,10 +1450,6 @@ inline void static SendRaptorSymbol(const CBlockRef pblock, CNode *pfrom, const 
         Misbehaving(pfrom->GetId(), 100);
         return;
     }
-
-    // pfrom->symbolsSent +=1;
-
-    // return;
 }
 
 static bool ReconstructBlock(CNode *pfrom, const bool fXVal, int &missingCount, int &unnecessaryCount, CConnman& connman)
@@ -1922,6 +1916,7 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 bool ProcessRaptorSymbol(CNode* pfrom, int nSizeRaptorSymbol, std::string strCommand, CConnman& connman, CRaptorSymbol& _symbol)
 {
     LogPrint("raptor", "Processing raptor symbol\n");
+
     return true;
 
 }
@@ -3801,13 +3796,13 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             LOCK(cs_main);
             // TODO: nakul, raptor symbol size and header validation
             // LogPrint("raptor", "Header for raptor symbol is %s\n", raptorSymbol.header.GetHash());
-            LogPrint("raptor", "Raptor symbol nSize %u, nSymbolSize %u\n", raptorSymbol.nSize, raptorSymbol.nSymbolSize);
+            // LogPrint("raptor", "Raptor symbol nSize %u, nSymbolSize %u\n", raptorSymbol.nSize, raptorSymbol.nSymbolSize);
             if (!IsRaptorSymbolValid(pfrom, raptorSymbol.header) )
             {
                 Misbehaving(pfrom->id, 100);
                 LogPrintf("Received an invalid %s from peer %d\n", strCommand, pfrom->id);
 
-                //TODO: Clear Symbol data
+                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
                 return false;
 
             }
@@ -3816,11 +3811,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             {
                 uint256 prevHash = (raptorSymbol.header.hashPrevBlock);
                 BlockMap::iterator mi = mapBlockIndex.find(prevHash);
-                if (mi == mapBlockIndex.end()) {
-                    return error("Raptor symbol from peer %s will not connect, unknown previous block %s", pfrom->id,
-                                 prevHash.ToString());
+                if (mi == mapBlockIndex.end()) 
+                {
+                    return error("Raptor symbol from peer %s will not connect, unknown previous block %s", pfrom->id,prevHash.ToString());
                 }
-
             }
 
             CValidationState state;
@@ -3834,7 +3828,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                     LogPrintf("Received an invalid %s header from peer %d\n", strCommand, pfrom->id);
                 }
 
-                //TODO: clear Symbol data
+                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
                 return false;
             }
 
@@ -3842,7 +3836,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             if (!pindex)
             { 
                 LogPrintf("INTERNAL ERROR: pindex null"); 
-                // TODO: clear symbol data
+                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
                 return true;
             }
 
@@ -3853,7 +3847,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             if (pindex->nStatus & BLOCK_HAVE_DATA)
             {
                 //TODO: Already received check
-                //TODO: clear symbol data
+                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
 		LogPrint("raptor","Received raptor symbol but returning because we already have block data %s from peer %d size %d bytes\n",inv.hash.ToString(), pfrom->id, nSizeRaptorSymbol);
                 return true;
 
@@ -3862,29 +3856,31 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // Request full block slowly if this one isn't extending the longest chain.
             // Use the same raptor but not urgently, so it should be a part of vGetData request that needs to be sent
             // to all nodes with GETRAPTORCODES with this block inv
-            // TODO: Continue from here Nakul
 
-            //TODO: Nakul do this later, focus on current block
-            // if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
-            // {
-            //     connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
-            //     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-            //     CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
-            //     ss << inv;
-            //     // TODO: Write logic for all nodes
-            //     connman.PushMessage(pfrom, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
-            //
-            //     // for (auto node : lNodesSendingRaptorCodes)
-            //     // {
-            //     //     connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
-            //     //
-            //     // }
-            //
-            //     raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
-            //
-            //     LogPrintf("%s %s from peer %d received but does not extend longest chain; requesting raptor codes through GETDATA block\n", strCommand, inv.hash.ToString(), pfrom->id);
-            //     return true;
-            // }
+            if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
+            {
+		std::vector<CInv> vGetData;
+                vGetData.push_back(CInv(MSG_RAPTOR_CODES, pindex->GetBlockHash()));
+                connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
+                LogPrint("raptor","%s %s from peer %d received but does not extend longest chain; requesting via SendMessages vGetData\n",
+                          strCommand, inv.hash.ToString(), pfrom->id);
+                return true;
+
+                // connman.UpdateRaptorNodesSet(lNodesSendingRaptorCodes);
+                // CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+                // CInv inv(MSG_RAPTOR_CODES, pindex->GetBlockHash());
+                // ss << inv;
+                // TODO: Write logic for all nodes
+                // connman.PushMessage(pfrom, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
+
+                // for (auto node : lNodesSendingRaptorCodes)
+                // {
+                //     connman.PushMessage(node, CNetMsgMaker(pfrom->GetSendVersion()).Make(NetMsgType::GETRAPTORCODES, ss));
+                //
+                // }
+
+            }
 
             {
                 LogPrint("raptor", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(), pfrom->id, nSizeRaptorSymbol);
@@ -3897,9 +3893,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                     return error("%s %s from peer %d but was unrequested\n", strCommand, inv.hash.ToString(), pfrom->id);
 
                 }
-                
-
             }
+
+
+
 
             bool result = ProcessRaptorSymbol(pfrom, nSizeRaptorSymbol, strCommand, connman, raptorSymbol);
             return result;
@@ -4125,8 +4122,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         }
         pfrom->fRelayTxes = true;
     }
-
-
 
     else if (strCommand == NetMsgType::NOTFOUND) {
         // We do not care about the NOTFOUND message, but logging an Unknown Command
