@@ -49,7 +49,7 @@ public:
     CBlockHeader header;
     uint16_t nSymbolSize;
     uint32_t nSize;
-    std::vector<uint8_t> vEncoded;
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> vEncoded;
     uint16_t nBlockSize;
 
 public:
@@ -80,10 +80,11 @@ public:
 
     }
 
+    bool decode(std::vector<std::pair<uint32_t, std::vector<uint8_t>>>& vEncoded, uint16_t nBlockSize, uint16_t nSymbolSize, uint32_t nSize);
 };
 
 // extern std::map< uint256, > raptorSymbolsForReconstruction;
-extern std::map< uint256, std::vector<uint8_t> > raptorSymbolsForReconstruction;
+extern std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > raptorSymbolsForReconstruction;
 
 class CRaptorSymbolData
 {
@@ -128,9 +129,8 @@ public:
 
 extern CRaptorSymbolData raptordata; // Singleton class
 
-std::vector<uint8_t> encode ( const CBlockRef pblock, const uint16_t nSymbolSize);
+std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef pblock, uint16_t nSymbolSize);
 
-bool decode(std::vector<uint8_t>& vEncoded, uint16_t nBlockSize, uint16_t nSymbolSize, uint32_t nSize);
 bool IsRaptorSymbolValid(CNode* pfrom, const CBlockHeader& header);
 bool IsRaptorEnabled();
 

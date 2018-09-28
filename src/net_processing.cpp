@@ -1058,7 +1058,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
 
             it++;
 
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_GRAPHENE_BLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_GRAPHENE_BLOCK || MSG_RAPTOR_CODES)
             {
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
@@ -1916,17 +1916,18 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
 {
     LogPrint("raptor", "Processing raptor symbol\n");
-    // std::vector<uint8_t> recieved = _symbol.vEncoded;
-
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> received = _symbol.vEncoded;
     // First check if symbols are enough
-    (raptorSymbolsForReconstruction[_symbol.header.GetHash()]).insert(raptorSymbolsForReconstruction[_symbol.header.GetHash()].end(),_symbol.vEncoded.begin(),_symbol.vEncoded.end());
+    // (raptorSymbolsForReconstruction[_symbol.header.GetHash()]).insert(raptorSymbolsForReconstruction[_symbol.header.GetHash()].end(),received.begin(),received.end());
 
+    uint16_t blockSize = _symbol.nBlockSize;
+    uint16_t symbolSize = _symbol.nSymbolSize;
+    uint32_t size = _symbol.nSize;
 
+    bool ret = _symbol.decode(received, blockSize, symbolSize, size);
+    LogPrint("raptor", "Decode successful: %d \n", ret);
 
-
-
-
-    return true;
+    return ret;
 
 }
 
@@ -3866,6 +3867,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // Use the same raptor but not urgently, so it should be a part of vGetData request that needs to be sent
             // to all nodes with GETRAPTORCODES with this block inv
 
+            /**
             if (pindex->nChainWork <= chainActive.Tip()->nChainWork)
             {
 		std::vector<CInv> vGetData;
@@ -3893,6 +3895,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
             {
                 LogPrint("raptor", "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(), pfrom->id, nSizeRaptorSymbol);
+                // See if an inv is present and the block doesn't have data, in that case, this can be an expedited raptor symbol
 
                 // Do not process unrequested symbols
                 LOCK(pfrom->cs_mapraptorsymbolinflight);
@@ -3903,8 +3906,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
                 }
             }
+            */
 
             bool result = ProcessRaptorSymbol(raptorSymbol);
+            LogPrint("raptor", "Processed raptor code successfully %d\n", result);
             return result;
 
         }

@@ -17,7 +17,7 @@ namespace RaptorQ = RaptorQ__v1;
 
 CRaptorSymbolData raptordata;
 
-std::map< uint256, std::vector<uint8_t> > raptorSymbolsForReconstruction;
+std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > raptorSymbolsForReconstruction;
 
 CRaptorSymbol::CRaptorSymbol() 
 { 
@@ -46,14 +46,16 @@ CRaptorSymbol::CRaptorSymbol(const CBlockRef pblock, uint16_t nSymbolSize)
 }
 
 template <typename T>
-inline void pack (std::vector< uint8_t >& dst, T& data) {
+inline void pack (std::vector< uint8_t >& dst, T& data) 
+{
     // uint8_t * src = static_cast < uint8_t* >(static_cast < void * >(&data));
     uint8_t * src = reinterpret_cast < uint8_t* >(&data);
     dst.insert (dst.end (), src, src + sizeof (T));
 }   
 
 template <typename T>
-inline void unpack (std::vector <uint8_t >& src, int index, T& data) {
+inline void unpack (std::vector <uint8_t >& src, int index, T& data) 
+{
     copy (&src[index], &src[index + sizeof (T)], &data);
 }
 
@@ -199,7 +201,7 @@ bool IsRaptorEnabled()
     return fRaptorEnabled;
 }
 
-std::vector<uint8_t> encode (const CBlockRef pblock, uint16_t nSymbolSize)
+std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef pblock, uint16_t nSymbolSize)
 {
 
     // const CBlockIndex* pindex = nullptr;
@@ -279,14 +281,15 @@ std::vector<uint8_t> encode (const CBlockRef pblock, uint16_t nSymbolSize)
         // return false;
     }
 
-    uint256 symbol_id = pblock->GetBlockHeader().GetHash();
-
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> to_send;
     auto source_sym_it = enc.begin_source();
     std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
     for (; source_sym_it != enc.end_source(); ++source_sym_it) 
     {
         auto it = source_sym_data.begin();
         auto written = (*source_sym_it) (it, source_sym_data.end());
+        uint32_t tmp_id = (*source_sym_it ).id();
+
         if (written != nSymbolSize) 
         {
             // this can only happen if "source_sym_data" did not have
@@ -294,11 +297,13 @@ std::vector<uint8_t> encode (const CBlockRef pblock, uint16_t nSymbolSize)
             LogPrint("raptor","written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n",written,nSymbolSize);
         }
 
+        to_send.emplace_back(tmp_id, std::move(source_sym_data));
+
     }
-    return source_sym_data;
+    return to_send;
 }
 
-bool decode (std::vector<uint8_t>& vEncoded, uint16_t blockSize, uint16_t nSymbolSize, uint32_t nSize)
+bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>>>& vEncoded, uint16_t blockSize, uint16_t nSymbolSize, uint32_t nSize)
 {
     // define "Decoder_type" to write less afterwards
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
@@ -315,30 +320,29 @@ bool decode (std::vector<uint8_t>& vEncoded, uint16_t blockSize, uint16_t nSymbo
     // we fill it with zeros
     std::vector<uint8_t> output (nSize, 0);
 
-    // now push every received symbol into the decoder
-    // for (auto &rec_sym : vEncoded)
-    // {
-        // as a reminder:
-        //  rec_sym.first = symbol_id (uint32_t)
-        //  rec_sym.second = std::vector<uint8_t> symbol_data
-        // symbol_id tmp_id = rec_sym.first;
-        // auto it = rec_sym.begin();
-        // auto err = dec.add_symbol (it, rec_sym.second.end(), tmp_id);
 
-        // if (err != RaptorQ::Error::NONE && err != RaptorQ::Error::NOT_NEEDED)
-        // {
-        //     // When you add a symbol, you can get:
-        //     //   NONE: no error
-        //     //   NOT_NEEDED: libRaptorQ ignored it because everything is
-        //     //              already decoded
-        //     //   INITIALIZATION: wrong parameters to the decoder contructor
-        //     //   WRONG_INPUT: not enough data on the symbol?
-        //     //   some_other_error: errors in the library
-        //     LogPrintf("error adding?\n");
-        //     return false;
-        //
-        // }
-    // }
+    // now push every received symbol into the decoder
+
+    for (auto &rec_sym : vEncoded)
+    {
+        auto it = rec_sym.second.begin();
+        uint32_t tmp_id = rec_sym.first;
+
+        auto err = dec.add_symbol(it, rec_sym.second.end(), tmp_id  );
+        if (err != RaptorQ::Error::NONE && err != RaptorQ::Error::NOT_NEEDED)
+        {
+            // When you add a symbol, you can get:
+            //   NONE: no error
+            //   NOT_NEEDED: libRaptorQ ignored it because everything is
+            //              already decoded
+            //   INITIALIZATION: wrong parameters to the decoder contructor
+            //   WRONG_INPUT: not enough data on the symbol?
+            //   some_other_error: errors in the library
+            LogPrint("raptor","error adding? \n");
+            return false;
+
+        }
+    }
 
     // by now we now there will be no more input, so we tell this to the
     // decoder. You can skip this call, but if the decoder does not have
@@ -518,7 +522,7 @@ bool test_raptor (const uint32_t nSize, std::mt19937_64 &rnd, float drop_probabi
 
     // we will store here all encoded and transmitted symbols
     // std::pair<symbol id (esi), symbol data>
-    using symbol_id = uint32_t; // just a better name
+    using symbol_id = uint32_t;
     std::vector<std::pair<symbol_id, std::vector<uint8_t>>> received;
     {
         // in this block we will generate the symbols that will be sent to
