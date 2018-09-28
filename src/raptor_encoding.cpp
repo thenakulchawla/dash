@@ -1,11 +1,14 @@
 #include <iostream>
+#include <algorithm>
 #include "alert.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "init.h"
 #include "net.h"
 #include "primitives/block.h"
+#include "streams.h"
 #include "util.h"
+#include "version.h"
 #include "utiltime.h"
 #include "validation.h"
 // #include "serialize.h"
@@ -56,7 +59,7 @@ inline void pack (std::vector< uint8_t >& dst, T& data)
 template <typename T>
 inline void unpack (std::vector <uint8_t >& src, int index, T& data) 
 {
-    copy (&src[index], &src[index + sizeof (T)], &data);
+    std::copy (&src[index], &src[index + sizeof (T)], &data);
 }
 
 template <class T>
@@ -214,8 +217,9 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     // CBlock pblock;
     // bool ret = ReadBlockFromDisk(pblock, pindex, Params().GetConsensus());
 
-    int nSizeBlock = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION); 
-    LogPrint("raptor","Size of block to be encoded %d\n", nSizeBlock);
+    // int nSizeBlock = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION); 
+    // LogPrint("raptor","Size of block to be encoded %d\n", nSizeBlock);
+    LogPrint("raptor", "Block header before packing %s\n", pblock->GetBlockHeader().GetHash().ToString());
 
     std::vector<uint8_t> input;
     pack(input, *pblock);
@@ -283,12 +287,13 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
 
     std::vector<std::pair<uint32_t, std::vector<uint8_t>>> to_send;
     auto source_sym_it = enc.begin_source();
-    std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
     for (; source_sym_it != enc.end_source(); ++source_sym_it) 
     {
+        std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
         auto it = source_sym_data.begin();
         auto written = (*source_sym_it) (it, source_sym_data.end());
         uint32_t tmp_id = (*source_sym_it ).id();
+        LogPrint("raptor", "tmp_id during encoding : %d\n", tmp_id);
 
         if (written != nSymbolSize) 
         {
@@ -300,6 +305,128 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
         to_send.emplace_back(tmp_id, std::move(source_sym_data));
 
     }
+    // Decode her for testing
+
+    using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
+    LogPrint("raptor", "Decoding blockSize : using from above, nSymbolSize : %d, nSize : %d while encoding\n",  nSymbolSize, nSize);
+    // RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
+    // LogPrint("raptor", "Decoding block : %d, nSymbolSize : %d, nSize : %d\n", block, nSymbolSize, nSize);
+
+    
+    Decoder_type dec (block, nSymbolSize, Decoder_type::Report::COMPLETE);
+    // "Decoder_type::Report::COMPLETE" means that the decoder will not
+    // give us any output until we have decoded all the data.
+    // there are modes to extract the data symbol by symbol in an ordered
+    // an unordered fashion, but let's keep this simple.
+
+    // we will store the output of the decoder here:
+    // note: the output need to have at least "nSize" bytes, and
+    // we fill it with zeros
+    std::vector<uint8_t> output (nSize, 0);
+
+
+    // now push every received symbol into the decoder
+
+    for (auto &rec_sym : to_send)
+    {
+        // When you add a symbol, you can get:
+        //   NONE: no error
+        //   NOT_NEEDED: libRaptorQ ignored it because everything is
+        //              already decoded
+        //   INITIALIZATION: wrong parameters to the decoder contructor
+        //   WRONG_INPUT: not enough data on the symbol?
+        //   some_other_error: errors in the library
+        auto it = rec_sym.second.begin();
+        uint32_t tmp_id = rec_sym.first;
+        LogPrint("raptor", "to_send.size() : %d, rec_sym.second.size(): %d , tmp_id: %d\n", to_send.size(), rec_sym.second.size(), tmp_id);
+
+        auto err = dec.add_symbol(it, rec_sym.second.end(), tmp_id  );
+        if (err == RaptorQ::Error::NONE) 
+        {
+            LogPrint("raptor", " NONE error in decoder while encoding\n");
+            // return false;
+        }
+        else if (err == RaptorQ::Error::NOT_NEEDED)
+        {
+            LogPrint("raptor", " NOT_NEEDED error in decoder while encoding\n");
+            // return false;
+        }
+        else if (err == RaptorQ::Error::WRONG_INPUT)
+        {
+            LogPrint("raptor", "  WRONG_INPUT in decoder while encoding\n");
+            // return false;
+        }
+        else if (err == RaptorQ::Error::INITIALIZATION)
+        {
+            LogPrint("raptor", "INITIALIZATION error in decoder while encoding\n");
+            // return false;
+        }
+        else
+        {
+            LogPrint("raptor","error adding, library  while encoding \n");
+            // return false;
+
+        }
+
+    }
+
+
+    // by now we now there will be no more input, so we tell this to the
+    // decoder. You can skip this call, but if the decoder does not have
+    // enough data it sill wait forever (or until you call .stop())
+    dec.end_of_input (RaptorQ::Fill_With_Zeros::NO);
+    // optional if you want partial decoding without using the repair
+    // symbols
+    // std::vector<bool> symbols_bitmask = dec.end_of_input (
+    //                                          RaptorQ::Fill_With_Zeros::YES);
+
+    // decode, and do not return until the computation is finished.
+    auto res = dec.wait_sync();
+    if (res.error != RaptorQ::Error::NONE) {
+        LogPrintf( "Couldn't decode.\n");
+        // return false;
+    }
+
+    // now save the decoded data into our output, and finally make a block out of it to be flushed
+    size_t decode_from_byte = 0;
+    size_t skip_bytes_at_beginning_of_output =0;
+    auto out_it = output.begin();
+    auto decoded = dec.decode_bytes (out_it, output.end(), decode_from_byte, skip_bytes_at_beginning_of_output);
+    // "decode_from_byte" can be used to have only a part of the output.
+    // it can be used in advanced setups where you ask only a part
+    // of the block at a time.
+    // "skip_bytes_at_begining_of_output" is used when dealing with containers
+    // which size does not align with the output. For really advanced usage only
+    // Both should be zero for most setups.
+
+    if (decoded.written != nSize) 
+    {
+        if (decoded.written == 0) 
+        {
+            // we were really unlucky and the RQ algorithm needed
+            // more symbols!
+            LogPrintf( "Couldn't decode, RaptorQ Algorithm failure. Can't Retry.\n");
+        } 
+        else 
+        {
+            // probably a library error
+            LogPrintf( "Partial Decoding? This should not have happened: decoded-wriiten %d vs nSize %s \n ", decoded.written, nSize);
+        }
+        // return false;
+    } 
+    else 
+    {
+        LogPrintf( "Decoded: %d\n ", nSize) ;
+    }
+
+    CBlock decode_block;
+    // size_t offset=0;
+    // unpack(output,offset,decode_block);
+
+    CDataStream ss(output, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> decode_block;
+    LogPrint("raptor", "Block header after unpacking %d\n", decode_block.GetBlockHeader().GetHash().ToString());
+
     return to_send;
 }
 
@@ -307,7 +434,10 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
 {
     // define "Decoder_type" to write less afterwards
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
+    LogPrint("raptor", "Decoding blockSize : %d, nSymbolSize : %d, nSize : %d\n", blockSize, nSymbolSize, nSize);
     RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
+    // LogPrint("raptor", "Decoding block : %d, nSymbolSize : %d, nSize : %d\n", block, nSymbolSize, nSize);
+
     
     Decoder_type dec (block, nSymbolSize, Decoder_type::Report::COMPLETE);
     // "Decoder_type::Report::COMPLETE" means that the decoder will not
@@ -325,24 +455,47 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
 
     for (auto &rec_sym : vEncoded)
     {
+        // When you add a symbol, you can get:
+        //   NONE: no error
+        //   NOT_NEEDED: libRaptorQ ignored it because everything is
+        //              already decoded
+        //   INITIALIZATION: wrong parameters to the decoder contructor
+        //   WRONG_INPUT: not enough data on the symbol?
+        //   some_other_error: errors in the library
         auto it = rec_sym.second.begin();
         uint32_t tmp_id = rec_sym.first;
+        LogPrint("raptor", "vEncoded.size() : %d, rec_sym.second.size(): %d , tmp_id: %d\n", vEncoded.size(), rec_sym.second.size(), tmp_id);
 
         auto err = dec.add_symbol(it, rec_sym.second.end(), tmp_id  );
-        if (err != RaptorQ::Error::NONE && err != RaptorQ::Error::NOT_NEEDED)
+        if (err == RaptorQ::Error::NONE) 
         {
-            // When you add a symbol, you can get:
-            //   NONE: no error
-            //   NOT_NEEDED: libRaptorQ ignored it because everything is
-            //              already decoded
-            //   INITIALIZATION: wrong parameters to the decoder contructor
-            //   WRONG_INPUT: not enough data on the symbol?
-            //   some_other_error: errors in the library
-            LogPrint("raptor","error adding? \n");
+            LogPrint("raptor", " NONE error in decoder\n");
+            return false;
+        }
+        else if (err == RaptorQ::Error::NOT_NEEDED)
+        {
+            LogPrint("raptor", " NOT_NEEDED error in decoder\n");
+            return false;
+        }
+        else if (err == RaptorQ::Error::WRONG_INPUT)
+        {
+            LogPrint("raptor", "  WRONG_INPUT in decoder\n");
+            return false;
+        }
+        else if (err == RaptorQ::Error::INITIALIZATION)
+        {
+            LogPrint("raptor", "INITIALIZATION error in decoder\n");
+            return false;
+        }
+        else
+        {
+            LogPrint("raptor","error adding, library  \n");
             return false;
 
         }
+
     }
+
 
     // by now we now there will be no more input, so we tell this to the
     // decoder. You can skip this call, but if the decoder does not have
