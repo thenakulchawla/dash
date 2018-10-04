@@ -1354,7 +1354,6 @@ inline void static SendBlockTransactions(const CBlock& block, const BlockTransac
     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
-
 inline void static SendGrapheneBlock(const CBlockRef pblock, CNode *pfrom, const CInv &inv, CConnman& connman)
 {
     int64_t nReceiverMemPoolTx = pfrom->nGrapheneMemPoolTx;
@@ -1433,7 +1432,8 @@ inline void static SendRaptorSymbol(const CBlockRef pblock, CNode *pfrom, const 
         {
             uint16_t nSymbolSize = 16;
             CRaptorSymbol raptorSymbol(MakeBlockRef(*pblock), nSymbolSize);
-            LogPrint("raptor","Setting raptorcode to send nSymbolSize:%d\n", nSymbolSize);
+            // CRaptorSymbol raptorSymbol(nSymbolSize);
+            LogPrint("raptor","Setting raptorcode to send nSymbolSize:%d\n", raptorSymbol.nSymbolSize);
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::RAPTORCODESYMBOL, raptorSymbol));
 
         }
@@ -1915,7 +1915,8 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 
 bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
 {
-    LogPrint("raptor", "Processing raptor symbol\n");
+    LogPrint("raptor", "Processing raptor symbol of size: %d\n", _symbol.vEncoded.size());
+
     std::vector<std::pair<uint32_t, std::vector<uint8_t>>> received = _symbol.vEncoded;
     // First check if symbols are enough
     // (raptorSymbolsForReconstruction[_symbol.header.GetHash()]).insert(raptorSymbolsForReconstruction[_symbol.header.GetHash()].end(),received.begin(),received.end());
@@ -1927,7 +1928,11 @@ bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
     bool ret = _symbol.decode(received, blockSize, symbolSize, size);
     LogPrint("raptor", "Decode successful: %d \n", ret);
 
+    if (ret)
+        MarkBlockAsReceived(_symbol.header.GetHash());
+
     return ret;
+    // return true;
 
 }
 
@@ -3806,7 +3811,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             LOCK(cs_main);
             // TODO: nakul, raptor symbol size and header validation
             // LogPrint("raptor", "Header for raptor symbol is %s\n", raptorSymbol.header.GetHash());
-            // LogPrint("raptor", "Raptor symbol nSize %u, nSymbolSize %u\n", raptorSymbol.nSize, raptorSymbol.nSymbolSize);
+            LogPrint("raptor", "Raptor symbol nSymbolSize %d\n",  raptorSymbol.nSymbolSize);
             if (!IsRaptorSymbolValid(pfrom, raptorSymbol.header) )
             {
                 Misbehaving(pfrom->id, 100);
@@ -3911,6 +3916,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             bool result = ProcessRaptorSymbol(raptorSymbol);
             LogPrint("raptor", "Processed raptor code successfully %d\n", result);
             return result;
+            // return true;
 
         }
 

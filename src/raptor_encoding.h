@@ -46,14 +46,15 @@ namespace RaptorQ = RaptorQ__v1;
 class CRaptorSymbol
 {
 public:
-    CBlockHeader header;
-    uint16_t nSymbolSize;
+    int nSymbolSize;
     uint32_t nSize;
-    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> vEncoded;
     uint16_t nBlockSize;
+    CBlockHeader header;
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> vEncoded;
 
 public:
     CRaptorSymbol();
+    // CRaptorSymbol(int nSymbolSize);
     CRaptorSymbol(const CBlockRef pblock, uint16_t nSymbolSize);
     ~CRaptorSymbol();
 
@@ -62,20 +63,20 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(header);
         READWRITE(nSymbolSize);
         READWRITE(nSize);
-        READWRITE(vEncoded);
         READWRITE(nBlockSize);
+        READWRITE(header);
+        READWRITE(vEncoded);
     }
 
     void SetNull()
     {
-        header.SetNull();
-        nSymbolSize =0;
-        nSize =0;
-        nBlockSize=0;
-        vEncoded.clear();
+        this->nSymbolSize=0;
+        this->header.SetNull();
+        this->nSize =0;
+        this->nBlockSize=0;
+        this->vEncoded.clear();
 
 
     }

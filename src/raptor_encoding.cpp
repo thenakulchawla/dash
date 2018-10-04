@@ -24,28 +24,34 @@ std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > rapt
 
 CRaptorSymbol::CRaptorSymbol() 
 { 
+    this->nSymbolSize=0;
 }
 
 CRaptorSymbol::~CRaptorSymbol()
 {
 }
 
+// CRaptorSymbol::CRaptorSymbol(int nSymbolSize)
+// {
+//     this->nSymbolSize = nSymbolSize;
+// }
+
 CRaptorSymbol::CRaptorSymbol(const CBlockRef pblock, uint16_t nSymbolSize)
 {
 
-    header = pblock->GetBlockHeader();
-    vEncoded = encode(pblock, nSymbolSize);
-    nSymbolSize = nSymbolSize;
-    
+    this->header = pblock->GetBlockHeader();
+    this->vEncoded = encode(pblock, nSymbolSize);
+    this->nSymbolSize = nSymbolSize;
+
     std::vector<uint8_t> input;
     pack(input,*pblock);
     uint16_t min_symbols = CalculateMinSymbols(nSymbolSize, input); 
-    uint16_t nBlockSize = CalculateBlockSizeForRaptorSymbol( min_symbols);
+    this->nBlockSize = CalculateBlockSizeForRaptorSymbol( min_symbols);
     RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( nBlockSize );
     RaptorQ::Encoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
 
-    nSize = CalculateTotalSymbolSize(enc, input);
-    
+    this->nSize = CalculateTotalSymbolSize(enc, input);
+
 }
 
 template <typename T>
@@ -231,8 +237,8 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
         ++min_symbols;
 
-    LogPrint("raptor","Size of input to be encoded %d\n", input.size());
-    LogPrint("raptor", "min_symbols %d\n", min_symbols);
+    // LogPrint("raptor","Size of input to be encoded %d\n", input.size());
+    // LogPrint("raptor", "min_symbols %d\n", min_symbols);
 
 
     // convert "symbols" to a typesafe equivalent, RaptorQ::Block_Size
@@ -269,7 +275,7 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     uint16_t _symbols = enc.symbols();
     // print some stuff in output
     
-    LogPrint("raptor", "Size: %d, symbols: %d, symbol size: %d \n", nSize, static_cast<uint32_t> (_symbols), static_cast<int32_t>(enc.symbol_size()) );
+    // LogPrint("raptor", "Size: %d, symbols: %d, symbol size: %d \n", nSize, static_cast<uint32_t> (_symbols), static_cast<int32_t>(enc.symbol_size()) );
 
     // RQ need to do its magic on the input before you can ask the symbols.
     // multiple ways to do this are available.
@@ -293,7 +299,7 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
         auto it = source_sym_data.begin();
         auto written = (*source_sym_it) (it, source_sym_data.end());
         uint32_t tmp_id = (*source_sym_it ).id();
-        LogPrint("raptor", "tmp_id during encoding : %d\n", tmp_id);
+        // LogPrint("raptor", "tmp_id during encoding : %d\n", tmp_id);
 
         if (written != nSymbolSize) 
         {
@@ -302,11 +308,13 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
             LogPrint("raptor","written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n",written,nSymbolSize);
         }
 
+        // LogPrint("raptor", "Encoding to_send of size %d\n", to_send.size());
         to_send.emplace_back(tmp_id, std::move(source_sym_data));
 
     }
     // Decode her for testing
 
+    /**
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
     LogPrint("raptor", "Decoding blockSize : using from above, nSymbolSize : %d, nSize : %d while encoding\n",  nSymbolSize, nSize);
     // RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
@@ -426,6 +434,7 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     CDataStream ss(output, SER_NETWORK, PROTOCOL_VERSION);
     ss >> decode_block;
     LogPrint("raptor", "Block header after unpacking %d\n", decode_block.GetBlockHeader().GetHash().ToString());
+    **/
 
     return to_send;
 }
@@ -434,7 +443,7 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
 {
     // define "Decoder_type" to write less afterwards
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
-    LogPrint("raptor", "Decoding blockSize : %d, nSymbolSize : %d, nSize : %d\n", blockSize, nSymbolSize, nSize);
+    // LogPrint("raptor", "Decoding blockSize : %d, nSymbolSize : %d, nSize : %d\n", blockSize, nSymbolSize, nSize);
     RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
     // LogPrint("raptor", "Decoding block : %d, nSymbolSize : %d, nSize : %d\n", block, nSymbolSize, nSize);
 
@@ -464,18 +473,18 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
         //   some_other_error: errors in the library
         auto it = rec_sym.second.begin();
         uint32_t tmp_id = rec_sym.first;
-        LogPrint("raptor", "vEncoded.size() : %d, rec_sym.second.size(): %d , tmp_id: %d\n", vEncoded.size(), rec_sym.second.size(), tmp_id);
+        // LogPrint("raptor", "vEncoded.size() : %d, rec_sym.second.size(): %d , tmp_id: %d\n", vEncoded.size(), rec_sym.second.size(), tmp_id);
 
         auto err = dec.add_symbol(it, rec_sym.second.end(), tmp_id  );
         if (err == RaptorQ::Error::NONE) 
         {
-            LogPrint("raptor", " NONE error in decoder\n");
-            return false;
+            // LogPrint("raptor", " NONE error in decoder\n");
+            // return false;
         }
         else if (err == RaptorQ::Error::NOT_NEEDED)
         {
-            LogPrint("raptor", " NOT_NEEDED error in decoder\n");
-            return false;
+            // LogPrint("raptor", " NOT_NEEDED error in decoder\n");
+            // return false;
         }
         else if (err == RaptorQ::Error::WRONG_INPUT)
         {
@@ -557,7 +566,13 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
     // }
 
     //Write logic to form the block and flush it to disk
+    CBlock decode_block;
+    // size_t offset=0;
+    // unpack(output,offset,decode_block);
 
+    CDataStream ss(output, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> decode_block;
+    LogPrint("raptor", "Block header after unpacking %d\n", decode_block.GetBlockHeader().GetHash().ToString());
 
     return true;
 
