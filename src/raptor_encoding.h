@@ -49,6 +49,7 @@ public:
     int nSymbolSize;
     uint32_t nSize;
     uint16_t nBlockSize;
+    // uint256 headerHash;
     CBlockHeader header;
     std::vector<std::pair<uint32_t, std::vector<uint8_t>>> vEncoded;
 

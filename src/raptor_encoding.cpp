@@ -227,6 +227,17 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     // LogPrint("raptor","Size of block to be encoded %d\n", nSizeBlock);
     LogPrint("raptor", "Block header before packing %s\n", pblock->GetBlockHeader().GetHash().ToString());
 
+    // First check whether the block is already encoded
+
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> to_send;
+    uint256 headerHash = pblock->GetBlockHeader().GetHash();
+    if (raptorSymbols.find( pblock->GetBlockHeader().GetHash()) != raptorSymbols.end() )
+    {
+        LogPrint("raptor", "Symbols are already encoded\n");
+        to_send = raptorSymbols[headerHash];
+        return to_send;
+    }
+            
     std::vector<uint8_t> input;
     pack(input, *pblock);
 
@@ -291,7 +302,6 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
         // return false;
     }
 
-    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> to_send;
     auto source_sym_it = enc.begin_source();
     for (; source_sym_it != enc.end_source(); ++source_sym_it) 
     {
@@ -312,6 +322,8 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
         to_send.emplace_back(tmp_id, std::move(source_sym_data));
 
     }
+
+    raptorSymbols.insert(std::make_pair(headerHash, to_send));
     // Decode her for testing
 
     /**

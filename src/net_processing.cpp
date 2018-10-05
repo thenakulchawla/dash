@@ -1937,8 +1937,6 @@ bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
         else
         {
             LogPrint("raptor", "Enough symbols to decode, start decoding\n");
-            
-
         }
 
     }
@@ -3270,14 +3268,14 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                             LogPrint("raptor", "Requesting raptor codes for block, since getdata size = 1\n");
                             vGetData[0] = CInv(MSG_RAPTOR_CODES, vGetData[0].hash);
                             // TODO: Write logic for all nodes
-                            connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                            // connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vGetData));
 
 
-                            // for (auto node : lNodesSendingRaptorCodes)
-                            // {
-                            //     connman.PushMessage(node, msgMaker.Make(NetMsgType::GETDATA, vGetData));
-                            //
-                            // }
+                            for (auto node : lNodesSendingRaptorCodes)
+                            {
+                                connman.PushMessage(node, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+
+                            }
 
                         }
                     }
@@ -3793,7 +3791,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
             if (mi == mapBlockIndex.end())
             {
-                Misbehaving(pfrom->id, 100);
+                // Misbehaving(pfrom->id, 100);
                 return error("Peer %d requested nonexistent block %s", pfrom->id, inv.hash.ToString());
             }
 
@@ -3837,9 +3835,10 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
             // TODO: nakul, raptor symbol size and header validation
             // LogPrint("raptor", "Header for raptor symbol is %s\n", raptorSymbol.header.GetHash());
             LogPrint("raptor", "Raptor symbol nSymbolSize %d\n",  raptorSymbol.nSymbolSize);
+            // TODO: Nakul, take care of all Misbehaving later
             if (!IsRaptorSymbolValid(pfrom, raptorSymbol.header) )
             {
-                Misbehaving(pfrom->id, 100);
+                // Misbehaving(pfrom->id, 100);
                 LogPrintf("Received an invalid %s from peer %d\n", strCommand, pfrom->id);
 
                 raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
@@ -4915,16 +4914,17 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
                     ss << inv;
                     // TODO: Nakul, Write logic for all nodes
                     // TODO: Nakul, check only the above getdata
-                    connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
+                    // connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
             
-                    // for (auto node : lNodesSendingRaptorCodes)
-                    // {
-                    //     connman.PushMessage(node, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
-                    //
-                    // }
+                    for (auto node : lNodesSendingRaptorCodes)
+                    {
+                        connman.PushMessage(node, msgMaker.Make(NetMsgType::GETRAPTORCODES, ss));
+                        // MarkBlockAsInFlight(node->GetId(), pindex
+                        // raptordata.ClearRaptorSymbolData(node, raptorSymbol.header.GetHash());
 
-                    // raptordata.ClearRaptorSymbolData(pfrom, raptorSymbol.header.GetHash());
-                    // LogPrintf("SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
+                    }
+
+                    LogPrint("raptor","SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
 
                 }
                 else
