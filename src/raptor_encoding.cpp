@@ -20,7 +20,7 @@ namespace RaptorQ = RaptorQ__v1;
 
 CRaptorSymbolData raptordata;
 
-std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > raptorSymbolsForReconstruction;
+std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > raptorSymbols;
 
 CRaptorSymbol::CRaptorSymbol() 
 { 

@@ -1917,22 +1917,47 @@ bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
 {
     LogPrint("raptor", "Processing raptor symbol of size: %d\n", _symbol.vEncoded.size());
 
-    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> received = _symbol.vEncoded;
-    // First check if symbols are enough
-    // (raptorSymbolsForReconstruction[_symbol.header.GetHash()]).insert(raptorSymbolsForReconstruction[_symbol.header.GetHash()].end(),received.begin(),received.end());
-
     uint16_t blockSize = _symbol.nBlockSize;
     uint16_t symbolSize = _symbol.nSymbolSize;
     uint32_t size = _symbol.nSize;
+    uint256 header_hash = _symbol.header.GetHash();
 
-    bool ret = _symbol.decode(received, blockSize, symbolSize, size);
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> received = _symbol.vEncoded;
+    bool ret=false;
+
+    if ( raptorSymbols.find( header_hash) != raptorSymbols.end() )
+    {
+        std::vector<std::pair<uint32_t, std::vector<uint8_t>>> already = raptorSymbols[header_hash];
+        if ( already.size() < size )
+        {
+            already.insert(already.end(), received.begin(), received.end());
+            raptorSymbols[header_hash] = already;
+        
+        }
+        else
+        {
+            LogPrint("raptor", "Enough symbols to decode, start decoding\n");
+            
+
+        }
+
+    }
+    else
+    {
+        raptorSymbols.insert(std::make_pair(header_hash, received));
+
+    }
+
+    if (raptorSymbols[header_hash].size() >= size)
+        ret = _symbol.decode(raptorSymbols[header_hash], blockSize, symbolSize, size);
+
+    // bool ret = _symbol.decode(received, blockSize, symbolSize, size);
     LogPrint("raptor", "Decode successful: %d \n", ret);
 
     if (ret)
         MarkBlockAsReceived(_symbol.header.GetHash());
 
     return ret;
-    // return true;
 
 }
 

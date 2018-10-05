@@ -85,7 +85,7 @@ public:
 };
 
 // extern std::map< uint256, > raptorSymbolsForReconstruction;
-extern std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > raptorSymbolsForReconstruction;
+extern std::map< uint256, std::vector<std::pair<uint32_t, std::vector<uint8_t>>> > raptorSymbols;
 
 class CRaptorSymbolData
 {
