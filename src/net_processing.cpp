@@ -1318,7 +1318,7 @@ void static ProcessGetData(CNode* pfrom, const Consensus::Params& consensusParam
             // Track requests for our stuff.
             GetMainSignals().Inventory(inv.hash);
 
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_GRAPHENE_BLOCK )
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_GRAPHENE_BLOCK || inv.type == MSG_RAPTOR_CODES )
                 break;
         }
     }
@@ -1433,7 +1433,7 @@ inline void static SendRaptorSymbol(const CBlockRef pblock, CNode *pfrom, const 
             uint16_t nSymbolSize = 16;
             CRaptorSymbol raptorSymbol(MakeBlockRef(*pblock), nSymbolSize);
             // CRaptorSymbol raptorSymbol(nSymbolSize);
-            LogPrint("raptor","Setting raptorcode to send nSymbolSize:%d\n", raptorSymbol.nSymbolSize);
+            // LogPrint("raptor","Setting raptorcode to send nSymbolSize:%d\n", raptorSymbol.nSymbolSize);
             connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::RAPTORCODESYMBOL, raptorSymbol));
 
         }
@@ -1915,15 +1915,19 @@ bool ProcessGrapheneBlock(CNode *pfrom, int nSizeGrapheneBlock, std::string strC
 
 bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
 {
-    LogPrint("raptor", "Processing raptor symbol of size: %d\n", _symbol.vEncoded.size());
 
     uint16_t blockSize = _symbol.nBlockSize;
     uint16_t symbolSize = _symbol.nSymbolSize;
     uint32_t size = _symbol.nSize;
     uint256 header_hash = _symbol.header.GetHash();
+    bool ret=false;
 
     std::vector<std::pair<uint32_t, std::vector<uint8_t>>> received = _symbol.vEncoded;
-    bool ret=false;
+    // ret = _symbol.decode(received, blockSize, symbolSize, size);
+
+    size_t received_encoded = sizeof(_symbol.vEncoded);
+    LogPrint("raptor", "Processing raptor symbol of size: %d, %d\n", _symbol.vEncoded.size(), received_encoded);
+
 
     if ( raptorSymbols.find( header_hash) != raptorSymbols.end() )
     {
@@ -1932,11 +1936,12 @@ bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
         {
             already.insert(already.end(), received.begin(), received.end());
             raptorSymbols[header_hash] = already;
+            LogPrint("raptor", "Not enough symbols, after: %d\n", already.size());
         
         }
         else
         {
-            LogPrint("raptor", "Enough symbols to decode, start decoding\n");
+            LogPrint("raptor", "Enough symbols to decode, start decoding : %d for block: %s\n", already.size(), _symbol.header.GetHash().ToString());
         }
 
     }
@@ -1947,10 +1952,12 @@ bool ProcessRaptorSymbol( CRaptorSymbol& _symbol )
     }
 
     if (raptorSymbols[header_hash].size() >= size)
+    {
         ret = _symbol.decode(raptorSymbols[header_hash], blockSize, symbolSize, size);
+    }
 
     // bool ret = _symbol.decode(received, blockSize, symbolSize, size);
-    LogPrint("raptor", "Decode successful: %d \n", ret);
+    LogPrint("raptor", "Decode successful: %d for block: %s \n", ret, _symbol.header.GetHash().ToString());
 
     if (ret)
         MarkBlockAsReceived(_symbol.header.GetHash());
@@ -3746,7 +3753,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
     else if (strCommand == NetMsgType::GETRAPTORCODES)
     {
-        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+        // LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
         if (!pfrom->RaptorCapable())
         {
             Misbehaving(pfrom->id, 100);
@@ -3762,7 +3769,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         pfrom->nGetRaptorSymbolCount *= std::pow(1.0 -1.0 /150.0, (double)(nNow - pfrom->nGetRaptorLastTime));
         pfrom->nGetRaptorLastTime = nNow;
         pfrom->nGetRaptorSymbolCount +=1;
-        LogPrint("raptor", "nRaptorSymbolCount is %f\n", pfrom->nGetRaptorSymbolCount);
+        // LogPrint("raptor", "nRaptorSymbolCount is %f\n", pfrom->nGetRaptorSymbolCount);
         if (chainparams.NetworkIDString() == "main")
         {
             if (pfrom->nGetRaptorSymbolCount >= 20)
@@ -3814,7 +3821,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
     else if (strCommand == NetMsgType::RAPTORCODESYMBOL && fRaptorEnabled)
     {
         // send block header along with every symnbol
-        LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+        // LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
         if (!pfrom->RaptorCapable())
         {
             Misbehaving(pfrom->GetId(), 100);
@@ -4924,7 +4931,7 @@ bool SendMessages(CNode* pto, CConnman& connman, const std::atomic<bool>& interr
 
                     }
 
-                    LogPrint("raptor","SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
+                    // LogPrint("raptor","SendMessages: Requesting Raptor Codes for block %s (%d) from all peers\n", pindex->GetBlockHash().ToString(), pindex->nHeight);
 
                 }
                 else

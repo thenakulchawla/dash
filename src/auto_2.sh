@@ -1,9 +1,9 @@
 rm -rf ~/.dashcore_data_4
-mkdir ~/.dashcore_data_3
+mkdir ~/.dashcore_data_4
 
-./dashd -regtest -daemon -debug -use-raptor=1 -port=8336 -rpcport=8337 -datadir=/home/nchawla3/.dashcore_data_3 -conf=/home/nchawla3/.dashcore/dash.conf
+./dashd -regtest -daemon -debug -use-raptor=1 -port=8336 -rpcport=8337 -datadir=/home/nchawla3/.dashcore_data_4 -conf=/home/nchawla3/.dashcore/dash.conf
 
-sleep 10
+sleep 5
 
 ./dash-cli -regtest -debug -use-raptor=1 -port=8336 -rpcport=8337 addnode "172.17.0.1:8330" "onetry"
 ./dash-cli -regtest -debug -use-raptor=1 -port=8336 -rpcport=8337 addnode "172.17.0.1:8332" "onetry"
@@ -21,4 +21,4 @@ sleep 1
 ./dash-cli -regtest -debug -use-raptor=1 -port=8336 -rpcport=8337 getconnectioncount
 
 sleep 1
-./dash-cli -regtest -debug -use-raptor=1 -port=8336 -rpcport=8337 generate 2
+./dash-cli -regtest -debug -use-raptor=1 -port=8336 -rpcport=8337 generate 1

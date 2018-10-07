@@ -210,6 +210,7 @@ bool IsRaptorEnabled()
     return fRaptorEnabled;
 }
 
+/**
 std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef pblock, uint16_t nSymbolSize)
 {
 
@@ -225,18 +226,25 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
 
     // int nSizeBlock = ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION); 
     // LogPrint("raptor","Size of block to be encoded %d\n", nSizeBlock);
-    LogPrint("raptor", "Block header before packing %s\n", pblock->GetBlockHeader().GetHash().ToString());
+    LogPrint("raptor", "Block header before packing %s, block size: %d\n", pblock->GetBlockHeader().GetHash().ToString(), pblock->GetBlockSize());
 
     // First check whether the block is already encoded
 
     std::vector<std::pair<uint32_t, std::vector<uint8_t>>> to_send;
     uint256 headerHash = pblock->GetBlockHeader().GetHash();
-    if (raptorSymbols.find( pblock->GetBlockHeader().GetHash()) != raptorSymbols.end() )
-    {
-        LogPrint("raptor", "Symbols are already encoded\n");
-        to_send = raptorSymbols[headerHash];
-        return to_send;
-    }
+    // if (raptorSymbols.find( pblock->GetBlockHeader().GetHash()) != raptorSymbols.end() )
+    // {
+    //     // LogPrint("raptor", "Symbols are already encoded\n");
+    //     to_send = raptorSymbols[headerHash];
+    //     // LogPrint("raptor", "Deleting to_send symbols: %d\n",to_send.size()/4);
+    //     // for (int i=to_send.size();i>to_send.size()-to_send.size()/4;i--)
+    //     // {
+    //     //     int index = rand()%i;
+    //     //     to_send.erase(to_send.begin() + index);
+    //     // }
+    //     // LogPrint("raptor", "size of to_send:%d\n", to_send.size());
+    //     return to_send;
+    // }
             
     std::vector<uint8_t> input;
     pack(input, *pblock);
@@ -273,20 +281,11 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     // it can use
     uint32_t nSize = enc.set_data(input.begin(), input.end());
     
-    // if (enc.set_data(input.begin(), input.end()) != nSize)
-    // {
-    //     LogPrint("raptor", "Could not give data to the encoder\n");
-    //     LogPrint("raptor", "Encoder size should be %d\n", static_cast<uint32_t>(size_to_be));
-    //
-    //     // return false;
-    // }
-
     // actual symbols. you could just use static_cast<uint16_t> (blok)
     // but this way you can actually query the encoder.
     uint16_t _symbols = enc.symbols();
     // print some stuff in output
     
-    // LogPrint("raptor", "Size: %d, symbols: %d, symbol size: %d \n", nSize, static_cast<uint32_t> (_symbols), static_cast<int32_t>(enc.symbol_size()) );
 
     // RQ need to do its magic on the input before you can ask the symbols.
     // multiple ways to do this are available.
@@ -305,28 +304,80 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     auto source_sym_it = enc.begin_source();
     for (; source_sym_it != enc.end_source(); ++source_sym_it) 
     {
-        std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
-        auto it = source_sym_data.begin();
-        auto written = (*source_sym_it) (it, source_sym_data.end());
-        uint32_t tmp_id = (*source_sym_it ).id();
-        // LogPrint("raptor", "tmp_id during encoding : %d\n", tmp_id);
+            std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
+            auto it = source_sym_data.begin();
+            auto written = (*source_sym_it) (it, source_sym_data.end());
+            uint32_t tmp_id = (*source_sym_it ).id();
+            // LogPrint("raptor", "tmp_id during encoding : %d\n", tmp_id);
 
-        if (written != nSymbolSize) 
-        {
-            // this can only happen if "source_sym_data" did not have
+            if (written != nSymbolSize) 
+            {
+                // this can only happen if "source_sym_data" did not have
+                // enough space for a symbol (here: never)
+                LogPrint("raptor","written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n",written,nSymbolSize);
+            }
+
+            // LogPrint("raptor", "Encoding to_send of size %d\n", to_send.size());
+            to_send.emplace_back(tmp_id, std::move(source_sym_data));
+            // LogPrint("raptor", "Size of to_send before repair %d\n", to_send.size());
+
+    }
+
+    auto repair_sym_it = enc.begin_repair();
+    // RaptorQ can theoretically handle
+    // infinite repair symbols
+    // but computers are not so infinite
+    // we need to have at least enc.symbols() + overhead symbols.
+    auto max_repair = enc.max_repair(); 
+
+
+    for (; to_send.size() < (enc.symbols()) &&
+            repair_sym_it != enc.end_repair (max_repair);
+            ++repair_sym_it) {
+        // we save the symbol here:
+        // make sure the vector has enough space for the symbol:
+        // fill it with zeros for the size of the symbol
+        std::vector<uint8_t> repair_sym_data (nSymbolSize, 0);
+
+        // save the data of the symbol into our vector
+        auto it = repair_sym_data.begin();
+        auto written = (*repair_sym_it) (it, repair_sym_data.end());
+        if (written != nSymbolSize) {
+            // this can only happen if "repair_sym_data" did not have
             // enough space for a symbol (here: never)
-            LogPrint("raptor","written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n",written,nSymbolSize);
+            LogPrint("raptor","written %d -vs- symbol_size %d Could not get the whole repair symbol!\n", written, nSymbolSize);
+            // return false;
         }
 
-        // LogPrint("raptor", "Encoding to_send of size %d\n", to_send.size());
-        to_send.emplace_back(tmp_id, std::move(source_sym_data));
+        // can we keep this symbol or do we randomly drop it?
+        // float dropped = drop_rnd (rnd);
+        // if (dropped <= drop_probability) {
+        //     continue; // start the cycle again
+        // }
+
+        // good, the symbol was received.
+        // ++received_tot;
+        // add it to the vector of received symbols
+        uint32_t tmp_id = (*repair_sym_it).id();
+        LogPrint("raptor", "tmp_id for repair symbols:%d\n", tmp_id);
+        
+        to_send.emplace_back (tmp_id, std::move(repair_sym_data));
 
     }
 
     raptorSymbols.insert(std::make_pair(headerHash, to_send));
+    // LogPrint("raptor", "index  to delete: %d\n",index);
+    // LogPrint("raptor", "Deleting to_send symbols: %d, before deleting: %d\n",to_send.size()/4, to_send.size());
+    // for (int i=to_send.size();i>to_send.size()-to_send.size()/4;i--)
+    // {
+    //     int index = rand()%i;
+    //     to_send.erase(to_send.begin() + index);
+    // }
+
+    LogPrint("raptor", "size of to_send:%d\n", to_send.size());
+
     // Decode her for testing
 
-    /**
     using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
     LogPrint("raptor", "Decoding blockSize : using from above, nSymbolSize : %d, nSize : %d while encoding\n",  nSymbolSize, nSize);
     // RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
@@ -446,10 +497,266 @@ std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef p
     CDataStream ss(output, SER_NETWORK, PROTOCOL_VERSION);
     ss >> decode_block;
     LogPrint("raptor", "Block header after unpacking %d\n", decode_block.GetBlockHeader().GetHash().ToString());
+
+    return to_send;
+}
+**/
+
+std::vector<std::pair<uint32_t, std::vector<uint8_t>>> encode (const CBlockRef pblock, uint16_t nSymbolSize)
+{
+
+    LogPrint("raptor", "Block header before packing %s, %d transactions, hashPrevBlock %s, hashMerkleRoot %s, nTime: %d, nBits:%d, nNonce:%d, nVersion:%d \n", pblock->GetBlockHeader().GetHash().ToString(), pblock->vtx.size(), pblock->hashPrevBlock.ToString(), pblock->hashMerkleRoot.ToString(), pblock->nTime, pblock->nBits, pblock->nNonce, pblock->nVersion);
+    std::vector<std::pair<uint32_t, std::vector<uint8_t>>> to_send;
+    uint256 headerHash = pblock->GetBlockHeader().GetHash();
+
+    std::vector<uint8_t> input;
+    pack(input, *pblock);
+
+    // how many symbols do we need to encode all our input in a single block?
+    // auto min_symbols = (input.size() * sizeof(uint256)) / nSymbolSize;
+    
+    auto min_symbols = (input.size()*sizeof(uint8_t)) / nSymbolSize;
+    if ((input.size() * sizeof(uint8_t)) % nSymbolSize != 0)
+        ++min_symbols;
+
+    // LogPrint("raptor","Size of input to be encoded %d\n", input.size());
+    // LogPrint("raptor", "min_symbols %d\n", min_symbols);
+
+
+    // convert "symbols" to a typesafe equivalent, RaptorQ::Block_Size
+    // This is needed because not all numbers are valid block sizes, and this
+    // helps you choose the right block size
+    RaptorQ::Block_Size block = RaptorQ::Block_Size::Block_10;
+    for (auto blk : *RaptorQ::blocks)
+    {
+        // RaptorQ::blocks is a pointer to an array, just scan it to find your
+        // block.
+        if (static_cast<uint16_t> (blk) >= min_symbols) {
+            block = blk;
+            break;
+        }
+
+    }
+
+    RaptorQ::Encoder<typename std::vector<uint8_t>::iterator, typename std::vector<uint8_t>::iterator> enc (block, nSymbolSize);
+
+    // give input to the encoder, the encoder answers with the size of what
+    // it can use
+    uint32_t nSize = enc.set_data(input.begin(), input.end());
+    
+    // actual symbols. you could just use static_cast<uint16_t> (blok)
+    // but this way you can actually query the encoder.
+    uint16_t _symbols = enc.symbols();
+    
+    LogPrint("raptor", "Size: %d, symbols: %d, symbol size: %d \n", nSize, static_cast<uint32_t> (_symbols), static_cast<int32_t>(enc.symbol_size()) );
+
+    // RQ need to do its magic on the input before you can ask the symbols.
+    // multiple ways to do this are available.
+    // The simplest is to run the computation and block everything until
+    // the work has been done. Not a problem for small sizes (<200),
+    // but big sizes will take **a lot** of time, consider running this with the
+    // asynchronous calls
+    if (!enc.compute_sync()) 
+    {
+        // if this happens it's a bug in the library.
+        // the **Decoder** can fail, but the **Encoder** can never fail.
+        LogPrint("raptor","Enc-RaptorQ failure! really bad!\n");
+        // return false;
+    }
+
+    auto source_sym_it = enc.begin_source();
+    for (; source_sym_it != enc.end_source(); ++source_sym_it) 
+    {
+        std::vector<uint8_t> source_sym_data (nSymbolSize, 0);
+        auto it = source_sym_data.begin();
+        auto written = (*source_sym_it) (it, source_sym_data.end());
+        uint32_t tmp_id = (*source_sym_it ).id();
+        LogPrint("raptor", "tmp_id during encoding : %d\n", tmp_id);
+
+        if (written != nSymbolSize) 
+        {
+            // this can only happen if "source_sym_data" did not have
+            // enough space for a symbol (here: never)
+            LogPrint("raptor","written %d -vs- nSymbolSize %d Could not get the whole source symbol!\n",written,nSymbolSize);
+        }
+
+        to_send.emplace_back(tmp_id, std::move(source_sym_data));
+
+    }
+
+    // Adding repair symbols
+
+    auto repair_sym_it = enc.begin_repair();
+    // RaptorQ can theoretically handle
+    // infinite repair symbols
+    // but computers are not so infinite
+    // we need to have at least enc.symbols() + overhead symbols.
+    auto max_repair = enc.max_repair(); 
+
+
+    for (; to_send.size() < (enc.symbols()) &&
+            repair_sym_it != enc.end_repair (max_repair);
+            ++repair_sym_it) {
+        // we save the symbol here:
+        // make sure the vector has enough space for the symbol:
+        // fill it with zeros for the size of the symbol
+        std::vector<uint8_t> repair_sym_data (nSymbolSize, 0);
+
+        // save the data of the symbol into our vector
+        auto it = repair_sym_data.begin();
+        auto written = (*repair_sym_it) (it, repair_sym_data.end());
+        if (written != nSymbolSize) {
+            // this can only happen if "repair_sym_data" did not have
+            // enough space for a symbol (here: never)
+            LogPrint("raptor","written %d -vs- symbol_size %d Could not get the whole repair symbol!\n", written, nSymbolSize);
+            // return false;
+        }
+
+        // can we keep this symbol or do we randomly drop it?
+        // float dropped = drop_rnd (rnd);
+        // if (dropped <= drop_probability) {
+        //     continue; // start the cycle again
+        // }
+
+        // good, the symbol was received.
+        // ++received_tot;
+        // add it to the vector of received symbols
+        uint32_t tmp_id = (*repair_sym_it).id();
+        LogPrint("raptor", "tmp_id for repair symbols:%d\n", tmp_id);
+        
+        to_send.emplace_back (tmp_id, std::move(repair_sym_data));
+
+    }
+
+    raptorSymbols.insert(std::make_pair(headerHash, to_send));
+
+    // Decode her for testing
+
+    /**
+    using Decoder_type = RaptorQ::Decoder<typename std::vector<uint8_t>::iterator,typename std::vector<uint8_t>::iterator>;
+    LogPrint("raptor", "Decoding blockSize : using from above, nSymbolSize : %d, nSize : %d while encoding\n",  nSymbolSize, nSize);
+    // RaptorQ::Block_Size block = static_cast<RaptorQ::Block_Size> ( blockSize );
+    // LogPrint("raptor", "Decoding block : %d, nSymbolSize : %d, nSize : %d\n", block, nSymbolSize, nSize);
+
+    
+    Decoder_type dec (block, nSymbolSize, Decoder_type::Report::COMPLETE);
+    // "Decoder_type::Report::COMPLETE" means that the decoder will not
+    // give us any output until we have decoded all the data.
+    // there are modes to extract the data symbol by symbol in an ordered
+    // an unordered fashion, but let's keep this simple.
+
+    // we will store the output of the decoder here:
+    // note: the output need to have at least "nSize" bytes, and
+    // we fill it with zeros
+    std::vector<uint8_t> output (nSize, 0);
+
+
+    // now push every received symbol into the decoder
+
+    for (auto &rec_sym : to_send)
+    {
+        // When you add a symbol, you can get:
+        //   NONE: no error
+        //   NOT_NEEDED: libRaptorQ ignored it because everything is
+        //              already decoded
+        //   INITIALIZATION: wrong parameters to the decoder contructor
+        //   WRONG_INPUT: not enough data on the symbol?
+        //   some_other_error: errors in the library
+        auto it = rec_sym.second.begin();
+        uint32_t tmp_id = rec_sym.first;
+        LogPrint("raptor", "to_send.size() : %d, rec_sym.second.size(): %d , tmp_id: %d\n", to_send.size(), rec_sym.second.size(), tmp_id);
+
+        auto err = dec.add_symbol(it, rec_sym.second.end(), tmp_id  );
+        if (err == RaptorQ::Error::NONE) 
+        {
+            // LogPrint("raptor", " NONE error in decoder while encoding\n");
+            // return false;
+        }
+        else if (err == RaptorQ::Error::NOT_NEEDED)
+        {
+            // LogPrint("raptor", " NOT_NEEDED error in decoder while encoding\n");
+            // return false;
+        }
+        else if (err == RaptorQ::Error::WRONG_INPUT)
+        {
+            LogPrint("raptor", "  WRONG_INPUT in decoder while encoding\n");
+            // return false;
+        }
+        else if (err == RaptorQ::Error::INITIALIZATION)
+        {
+            LogPrint("raptor", "INITIALIZATION error in decoder while encoding\n");
+            // return false;
+        }
+        else
+        {
+            LogPrint("raptor","error adding, library  while encoding \n");
+            // return false;
+
+        }
+
+    }
+
+
+    // by now we now there will be no more input, so we tell this to the
+    // decoder. You can skip this call, but if the decoder does not have
+    // enough data it sill wait forever (or until you call .stop())
+    dec.end_of_input (RaptorQ::Fill_With_Zeros::NO);
+    // optional if you want partial decoding without using the repair
+    // symbols
+    // std::vector<bool> symbols_bitmask = dec.end_of_input (
+    //                                          RaptorQ::Fill_With_Zeros::YES);
+
+    // decode, and do not return until the computation is finished.
+    auto res = dec.wait_sync();
+    if (res.error != RaptorQ::Error::NONE) {
+        LogPrintf( "Couldn't decode.\n");
+        // return false;
+    }
+
+    // now save the decoded data into our output, and finally make a block out of it to be flushed
+    size_t decode_from_byte = 0;
+    size_t skip_bytes_at_beginning_of_output =0;
+    auto out_it = output.begin();
+    auto decoded = dec.decode_bytes (out_it, output.end(), decode_from_byte, skip_bytes_at_beginning_of_output);
+    // "decode_from_byte" can be used to have only a part of the output.
+    // it can be used in advanced setups where you ask only a part
+    // of the block at a time.
+    // "skip_bytes_at_begining_of_output" is used when dealing with containers
+    // which size does not align with the output. For really advanced usage only
+    // Both should be zero for most setups.
+
+    if (decoded.written != nSize) 
+    {
+        if (decoded.written == 0) 
+        {
+            // we were really unlucky and the RQ algorithm needed
+            // more symbols!
+            LogPrintf( "Couldn't decode, RaptorQ Algorithm failure. Can't Retry.\n");
+        } 
+        else 
+        {
+            // probably a library error
+            LogPrintf( "Partial Decoding? This should not have happened: decoded-wriiten %d vs nSize %s \n ", decoded.written, nSize);
+        }
+        // return false;
+    } 
+    else 
+    {
+        LogPrintf( "Decoded: %d\n ", nSize) ;
+    }
+
+    CBlock decode_block;
+    // size_t offset=0;
+    // unpack(output,offset,decode_block);
+
+    CDataStream ss(output, SER_NETWORK, PROTOCOL_VERSION);
+    ss >> decode_block;
+    LogPrint("raptor", "Block header after unpacking %d\n", decode_block.GetBlockHeader().GetHash().ToString());
     **/
 
     return to_send;
 }
+
 
 bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>>>& vEncoded, uint16_t blockSize, uint16_t nSymbolSize, uint32_t nSize)
 {
@@ -563,7 +870,7 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
     } 
     else 
     {
-        LogPrintf( "Decoded: %d\n ", nSize) ;
+        LogPrintf( "Decoded: %d \n ", nSize) ;
     }
 
 
@@ -583,8 +890,12 @@ bool CRaptorSymbol::decode (std::vector<std::pair<uint32_t, std::vector<uint8_t>
     // unpack(output,offset,decode_block);
 
     CDataStream ss(output, SER_NETWORK, PROTOCOL_VERSION);
+    // std::vector<CTransactionRef> vtx;
     ss >> decode_block;
-    LogPrint("raptor", "Block header after unpacking %d\n", decode_block.GetBlockHeader().GetHash().ToString());
+   // >> vtx;
+    // LogPrint("raptor", "Block header after unpacking %d, transactions: %d \n", decode_block.GetBlockHeader().GetHash().ToString(), decode_block.GetBlockSize(), decode_block.vtx.size());
+
+    LogPrint("raptor", "Block header after packing %s, %d transactions, hashPrevBlock %s, hashMerkleRoot %s, nTime: %d, nBits:%d, nNonce:%d, nVersion:%d \n", decode_block.GetBlockHeader().GetHash().ToString(), decode_block.vtx.size(), decode_block.hashPrevBlock.ToString(), decode_block.hashMerkleRoot.ToString(), decode_block.nTime, decode_block.nBits, decode_block.nNonce, decode_block.nVersion);
 
     return true;
 
